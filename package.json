@@ -1,0 +1,9 @@
+{
+  "name": "pipelab",
+  "version": "1.0.0",
+  "description": "5-Stage RISC CPU Pipeline Simulator & Mission Control",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node test_engine.js && node verify_spec.js"
+  }
+}

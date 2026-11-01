@@ -1,0 +1,19 @@
+{
+  "name": "PipeLab - CPU Pipeline Architecture Simulator",
+  "short_name": "PipeLab",
+  "description": "Cycle-accurate 5-stage RISC CPU pipeline simulator and microarchitecture mission control.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#060913",
+  "theme_color": "#060913",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["education", "developer", "productivity"]
+}

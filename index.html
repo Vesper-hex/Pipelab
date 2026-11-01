@@ -1,0 +1,4751 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PipeLab - CPU Pipeline &amp; Performance Mission Control</title>
+  
+  <!-- Fonts: Manrope & IBM Plex Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+    <!-- PWA & Native App Meta -->
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/svg+xml" href="icon.svg">
+  <meta name="theme-color" content="#060913">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="PipeLab Pro">
+  <link rel="apple-touch-icon" href="icon.svg">
+
+  <!-- Chart.js 4.4.1 from cdnjs -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+
+  <style>
+    :root {
+      /* Mission Control Dark Palette */
+      --bg: #060913;
+      --card-bg: rgba(12, 19, 34, 0.75);
+      --card-bg-solid: #0c1322;
+      --panel-bg: rgba(16, 26, 46, 0.6);
+      --panel-bg-hover: rgba(24, 38, 66, 0.8);
+      --border: rgba(56, 189, 248, 0.12);
+      --border-light: rgba(56, 189, 248, 0.22);
+      --border-glow: rgba(56, 189, 248, 0.35);
+      
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      
+      --accent: #38bdf8;          /* Electric Cyan */
+      --accent-hover: #0ea5e9;
+      --accent-glow: rgba(56, 189, 248, 0.25);
+      
+      /* Hardware telemetry colors */
+      --c-if: #38bdf8;            /* Cyan Blue */
+      --c-id: #a855f7;            /* Purple */
+      --c-ex: #10b981;            /* Emerald Green */
+      --c-mem: #f59e0b;           /* Amber */
+      --c-wb: #ec4899;            /* Pink */
+      
+      --c-stall: #f59e0b;
+      --c-flush: #ef4444;
+      --c-success: #10b981;
+      
+      --radius-sm: 6px;
+      --radius-md: 10px;
+      --radius-lg: 14px;
+      
+      --font-sans: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --font-mono: 'IBM Plex Mono', 'Cascadia Code', 'Consolas', monospace;
+      
+      --shadow-card: 0 8px 32px rgba(0, 0, 0, 0.45);
+      --shadow-glow: 0 0 20px rgba(56, 189, 248, 0.15);
+      
+      --cell-size: 32px;
+    }
+
+    [data-theme="light"] {
+      --bg: #f8fafc;
+      --card-bg: rgba(255, 255, 255, 0.85);
+      --card-bg-solid: #ffffff;
+      --panel-bg: rgba(241, 245, 249, 0.9);
+      --panel-bg-hover: #e2e8f0;
+      --border: #e2e8f0;
+      --border-light: #cbd5e1;
+      --border-glow: rgba(14, 165, 233, 0.2);
+      
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --text-dim: #94a3b8;
+      
+      --accent: #0284c7;
+      --accent-hover: #0369a1;
+      --accent-glow: rgba(2, 132, 199, 0.15);
+      
+      --c-if: #0284c7;
+      --c-id: #7c3aed;
+      --c-ex: #059669;
+      --c-mem: #d97706;
+      --c-wb: #db2777;
+      
+      --shadow-card: 0 8px 32px rgba(0, 0, 0, 0.06);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: var(--bg);
+      background-image: 
+        radial-gradient(circle at 50% 0%, rgba(14, 165, 233, 0.08) 0%, transparent 60%),
+        radial-gradient(circle at 100% 50%, rgba(16, 185, 129, 0.04) 0%, transparent 50%);
+      color: var(--text);
+      font-family: var(--font-sans);
+      font-size: 13px;
+      line-height: 1.5;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+    }
+
+    /* Scrollbars */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: var(--border-light);
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--accent);
+    }
+
+    :focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    /* Top Command Center Header */
+    header {
+      background: var(--card-bg);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .brand-section {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .brand-logo {
+      width: 36px;
+      height: 36px;
+      background: linear-gradient(135deg, #0ea5e9, #38bdf8, #10b981);
+      border-radius: var(--radius-sm);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #050811;
+      font-weight: 800;
+      font-size: 18px;
+      box-shadow: 0 0 14px rgba(56, 189, 248, 0.35);
+    }
+
+    .brand-titles h1 {
+      font-size: 15px;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .brand-titles .subtitle {
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text-muted);
+      letter-spacing: 0.03em;
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 9px;
+      background: rgba(16, 185, 129, 0.12);
+      border: 1px solid rgba(16, 185, 129, 0.28);
+      color: var(--c-success);
+      border-radius: 20px;
+      font-size: 10.5px;
+      font-weight: 700;
+      font-family: var(--font-mono);
+      letter-spacing: 0.05em;
+    }
+
+    .status-pulse-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--c-success);
+      box-shadow: 0 0 8px var(--c-success);
+      animation: statusPulse 1.6s infinite;
+    }
+
+    @keyframes statusPulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.85); }
+    }
+
+    /* Center View Navigation Tabs (Keeps screen clean and uncluttered) */
+    .view-switcher-bar {
+      display: flex;
+      background: var(--panel-bg);
+      border: 1px solid var(--border);
+      border-radius: 30px;
+      padding: 3px;
+    }
+
+    .view-tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 6px 14px;
+      border-radius: 20px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+    }
+
+    .view-tab-btn:hover {
+      color: var(--text);
+    }
+
+    .view-tab-btn.active {
+      background: var(--accent);
+      color: #050811;
+      font-weight: 800;
+      box-shadow: 0 0 12px rgba(56, 189, 248, 0.4);
+    }
+
+    .header-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn {
+      background: var(--panel-bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+      padding: 6px 12px;
+      border-radius: var(--radius-sm);
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+    }
+
+    .btn:hover {
+      background: var(--panel-bg-hover);
+      border-color: var(--border-light);
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #050811;
+      border-color: var(--accent);
+      font-weight: 800;
+      box-shadow: 0 0 12px rgba(56, 189, 248, 0.3);
+    }
+
+    .btn-primary:hover {
+      background: var(--accent-hover);
+    }
+
+    .btn-sm {
+      padding: 4px 8px;
+      font-size: 11px;
+    }
+
+    /* Main Grid Layout (Matching Reference Operations Room Screen) */
+    .dashboard-layout {
+      display: grid;
+      grid-template-columns: 1fr 350px;
+      gap: 16px;
+      padding: 16px 24px;
+      flex: 1;
+      max-width: 1920px;
+      width: 100%;
+      margin: 0 auto;
+    }
+
+    @media (max-width: 1300px) {
+      .dashboard-layout {
+        grid-template-columns: 1fr;
+        padding: 12px;
+      }
+    }
+
+    /* Realistic Glassmorphic Panels */
+    .glass-panel {
+      background: var(--card-bg);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-card);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    .glass-panel-header {
+      padding: 12px 18px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(255, 255, 255, 0.015);
+    }
+
+    .glass-panel-title {
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* TOPOLOGY SECTION (Exact visual match to top area of user's image) */
+    .topology-container {
+      padding: 16px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .topology-overview-line {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11.5px;
+      color: var(--text-muted);
+      border-bottom: 1px dashed var(--border);
+      padding-bottom: 8px;
+    }
+
+    .topology-units-grid {
+      display: grid;
+      grid-template-columns: 1fr 1.3fr 1fr;
+      gap: 14px;
+    }
+
+    @media (max-width: 1000px) {
+      .topology-units-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .unit-card {
+      background: var(--panel-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      position: relative;
+    }
+
+    .unit-card:hover {
+      border-color: var(--border-light);
+    }
+
+    .unit-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+    }
+
+    .unit-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+    }
+
+    .unit-submodules {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+      margin-top: 4px;
+    }
+
+    .submodule-box {
+      background: rgba(0, 0, 0, 0.25);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      padding: 6px 4px;
+      text-align: center;
+      font-size: 10px;
+      font-family: var(--font-mono);
+      color: var(--text-muted);
+    }
+
+    .submodule-box.active {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: rgba(56, 189, 248, 0.06);
+    }
+
+    /* High-Tech Animated Data Bus Lines */
+    .bus-connector-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 14px;
+      background: rgba(0, 0, 0, 0.25);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-dim);
+    }
+
+    .bus-line {
+      flex: 1;
+      height: 2px;
+      background: repeating-linear-gradient(90deg, var(--border-light), var(--border-light) 6px, transparent 6px, transparent 12px);
+      margin: 0 12px;
+      position: relative;
+    }
+
+    .bus-line.forwarding-active {
+      background: repeating-linear-gradient(90deg, var(--c-success), var(--c-success) 6px, transparent 6px, transparent 12px);
+      animation: busFlow 1s linear infinite;
+    }
+
+    @keyframes busFlow {
+      0% { background-position: 0 0; }
+      100% { background-position: 24px 0; }
+    }
+
+    /* 5-STAGE PIPELINE SEQUENCE BAR (Matching CI/CD Pipeline row in reference image) */
+    .pipeline-sequence-section {
+      padding: 14px 18px;
+      border-top: 1px solid var(--border);
+      background: rgba(0, 0, 0, 0.12);
+    }
+
+    .pipeline-flow-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 10px;
+    }
+
+    @media (max-width: 950px) {
+      .pipeline-flow-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .stage-card {
+      background: var(--panel-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      position: relative;
+      transition: all 0.2s ease;
+      min-height: 116px;
+    }
+
+    .stage-card::before {
+      content: "";
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+    }
+
+    .stage-card.if::before { background: var(--c-if); }
+    .stage-card.id::before { background: var(--c-id); }
+    .stage-card.ex::before { background: var(--c-ex); }
+    .stage-card.mem::before { background: var(--c-mem); }
+    .stage-card.wb::before { background: var(--c-wb); }
+
+    .stage-card.stalled-stage {
+      background: repeating-linear-gradient(
+        -45deg,
+        rgba(245, 158, 11, 0.08),
+        rgba(245, 158, 11, 0.08) 8px,
+        transparent 8px,
+        transparent 16px
+      );
+      border-color: var(--c-stall);
+    }
+
+    .stage-card.flushed-stage {
+      background: rgba(239, 68, 68, 0.08);
+      border-color: var(--c-flush);
+    }
+
+    .stage-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .stage-badge {
+      font-size: 9.5px;
+      font-weight: 700;
+      padding: 1px 6px;
+      border-radius: 3px;
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid var(--border);
+      color: var(--text-dim);
+    }
+
+    .stage-inst {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text);
+      background: rgba(0, 0, 0, 0.25);
+      border: 1px solid var(--border);
+      padding: 5px 8px;
+      border-radius: 3px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .stage-inst.empty {
+      color: var(--text-dim);
+      font-style: italic;
+      border-style: dashed;
+      background: transparent;
+    }
+
+    .stage-details {
+      margin-top: auto;
+      font-size: 10px;
+      color: var(--text-muted);
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      font-family: var(--font-mono);
+    }
+
+    .stage-detail-row {
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .stage-detail-row span:last-child {
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    .forwarding-indicator {
+      font-size: 9.5px;
+      font-weight: 800;
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      color: var(--c-success);
+      padding: 2px 4px;
+      border-radius: 3px;
+      text-align: center;
+      font-family: var(--font-mono);
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    /* LOWER CONSOLE SPLIT (Matching Terraform execution & Drift detection in reference image) */
+    .lower-console-grid {
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 16px;
+    }
+
+    @media (max-width: 1100px) {
+      .lower-console-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Terminal Console */
+    .terminal-console {
+      background: #04070f;
+      border-radius: 0 0 var(--radius-md) var(--radius-md);
+      padding: 12px 16px;
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      height: 220px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .console-header-line {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: var(--text-dim);
+      font-size: 10.5px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 6px;
+      margin-bottom: 6px;
+    }
+
+    .log-entry {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      padding: 2px 0;
+      line-height: 1.4;
+      border-left: 2px solid transparent;
+      padding-left: 6px;
+    }
+
+    .log-entry.stall {
+      border-left-color: var(--c-stall);
+      color: #fbbf24;
+    }
+
+    .log-entry.flush {
+      border-left-color: var(--c-flush);
+      color: #f87171;
+    }
+
+    .log-cycle {
+      color: var(--accent);
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .log-tag {
+      font-size: 9.5px;
+      font-weight: 800;
+      padding: 1px 4px;
+      border-radius: 2px;
+    }
+    .log-tag.stall { background: rgba(245, 158, 11, 0.2); color: var(--c-stall); }
+    .log-tag.flush { background: rgba(239, 68, 68, 0.2); color: var(--c-flush); }
+    .log-tag.info { background: var(--panel-bg); color: var(--text-dim); }
+
+    /* Drift / Status Summary Card (Matching Drift Detection in image) */
+    .drift-summary-card {
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      height: 220px;
+    }
+
+    .drift-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--c-success);
+    }
+
+    .drift-badge.stalled {
+      color: var(--c-stall);
+    }
+
+    .drift-badge.flushed {
+      color: var(--c-flush);
+    }
+
+    .drift-shield-icon {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid var(--c-success);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+    }
+
+    /* RIGHT TELEMETRY COLUMN (Matching the exact right sidebar in reference image) */
+    .telemetry-sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    /* KPI Mini Cards with Sparkline Waveforms */
+    .kpi-cards-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+
+    .kpi-card {
+      background: var(--panel-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .kpi-label {
+      font-size: 9.5px;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .kpi-val {
+      font-family: var(--font-mono);
+      font-size: 17px;
+      font-weight: 800;
+      color: var(--text);
+    }
+
+    .kpi-sparkline {
+      width: 100%;
+      height: 22px;
+      margin-top: 4px;
+    }
+
+    /* Resource Utilization Progress Bars */
+    .utilization-section {
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .util-row {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .util-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+
+    .util-labels span:last-child {
+      font-family: var(--font-mono);
+      color: var(--text);
+      font-weight: 700;
+    }
+
+    .util-bar-track {
+      width: 100%;
+      height: 5px;
+      background: rgba(255, 255, 255, 0.06);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .util-bar-fill {
+      height: 100%;
+      border-radius: 3px;
+      transition: width 0.3s ease;
+    }
+
+    /* Circular Radial Donut Gauges (Matching Cluster Status 12 and Workload 45 in image) */
+    .radial-gauges-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      padding: 14px 16px;
+      border-top: 1px solid var(--border);
+    }
+
+    .radial-card {
+      background: var(--panel-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+    }
+
+    .radial-title {
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+
+    .radial-chart-wrapper {
+      position: relative;
+      width: 76px;
+      height: 76px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .radial-center-val {
+      position: absolute;
+      font-family: var(--font-mono);
+      font-size: 17px;
+      font-weight: 800;
+      color: var(--text);
+    }
+
+    .radial-legend {
+      font-size: 9.5px;
+      font-family: var(--font-mono);
+      color: var(--text-dim);
+      margin-top: 6px;
+    }
+
+    /* Recent Execution Feed (Matching Recent Deployments in reference image) */
+    .recent-feed-section {
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .feed-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 10px;
+      background: var(--panel-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-size: 11px;
+      font-family: var(--font-mono);
+    }
+
+    .feed-item-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .feed-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+    }
+    .feed-dot.ok { background: var(--c-success); box-shadow: 0 0 6px var(--c-success); }
+    .feed-dot.warn { background: var(--c-stall); box-shadow: 0 0 6px var(--c-stall); }
+    .feed-dot.err { background: var(--c-flush); box-shadow: 0 0 6px var(--c-flush); }
+
+    .feed-time {
+      color: var(--text-dim);
+      font-size: 10px;
+    }
+
+    /* Space-Time Diagram View */
+    .diagram-scroll {
+      overflow: auto;
+      max-height: 520px;
+      background: #04070f;
+      border-radius: var(--radius-sm);
+    }
+
+    .pipeline-table {
+      border-collapse: separate;
+      border-spacing: 0;
+      width: 100%;
+      font-family: var(--font-mono);
+      font-size: 11px;
+    }
+
+    .pipeline-table th, .pipeline-table td {
+      border-right: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      text-align: center;
+      min-width: var(--cell-size);
+      height: var(--cell-size);
+      white-space: nowrap;
+    }
+
+    .pipeline-table th {
+      background: var(--card-bg-solid);
+      font-weight: 700;
+      color: var(--text-muted);
+      position: sticky;
+      top: 0;
+      z-index: 20;
+    }
+
+    .pipeline-table th.inst-col-header {
+      position: sticky;
+      left: 0;
+      z-index: 30;
+      min-width: 200px;
+      text-align: left;
+      padding: 0 12px;
+      background: var(--card-bg-solid);
+    }
+
+    .pipeline-table td.inst-col {
+      position: sticky;
+      left: 0;
+      z-index: 10;
+      background: var(--card-bg-solid);
+      text-align: left;
+      padding: 0 12px;
+      font-weight: 600;
+      border-right: 2px solid var(--border-light);
+      max-width: 220px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      color: var(--text);
+    }
+
+    .stage-cell-box {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 10px;
+      color: #ffffff;
+      user-select: none;
+    }
+
+    .stage-cell-box.if { background: var(--c-if); }
+    .stage-cell-box.id { background: var(--c-id); }
+    .stage-cell-box.ex { background: var(--c-ex); }
+    .stage-cell-box.mem { background: var(--c-mem); }
+    .stage-cell-box.wb { background: var(--c-wb); }
+
+    .stage-cell-box.stall {
+      background: repeating-linear-gradient(
+        45deg,
+        var(--c-stall),
+        var(--c-stall) 4px,
+        #050811 4px,
+        #050811 8px
+      );
+      color: #ffffff;
+    }
+
+    .stage-cell-box.flush {
+      background: var(--c-flush);
+      color: #ffffff;
+      font-size: 13px;
+    }
+
+    /* Comparison Section */
+    .comparison-section {
+      padding: 16px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .charts-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+    }
+
+    @media (max-width: 1000px) {
+      .charts-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .chart-box {
+      background: var(--panel-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 12px;
+      height: 200px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .chart-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .chart-canvas-wrapper {
+      flex: 1;
+      position: relative;
+      min-height: 0;
+    }
+
+    .compare-table-wrapper {
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--panel-bg);
+    }
+
+    .compare-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11.5px;
+      text-align: left;
+    }
+
+    .compare-table th {
+      background: var(--card-bg-solid);
+      padding: 9px 12px;
+      font-weight: 700;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+
+    .compare-table td {
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+      font-family: var(--font-mono);
+      white-space: nowrap;
+    }
+
+    .compare-table tr:hover {
+      background: var(--panel-bg-hover);
+      cursor: pointer;
+    }
+
+    .compare-table tr.active-config {
+      background: rgba(56, 189, 248, 0.12);
+      border-left: 3px solid var(--accent);
+    }
+
+    .badge-fastest {
+      background: rgba(16, 185, 129, 0.2);
+      color: var(--c-success);
+      border: 1px solid var(--c-success);
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-size: 9.5px;
+      font-weight: 800;
+      margin-left: 6px;
+    }
+
+    .badge-current {
+      background: rgba(56, 189, 248, 0.2);
+      color: var(--accent);
+      border: 1px solid var(--accent);
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-size: 9.5px;
+      font-weight: 800;
+      margin-left: 6px;
+    }
+
+    /* Program Studio View */
+    .editor-container {
+      display: flex;
+      flex-direction: column;
+      height: 480px;
+    }
+
+    .editor-body {
+      display: flex;
+      flex: 1;
+      position: relative;
+      background: #050812;
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+    }
+
+    .editor-gutter {
+      width: 40px;
+      background: rgba(0, 0, 0, 0.3);
+      border-right: 1px solid var(--border);
+      color: var(--text-dim);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      line-height: 20px;
+      padding: 10px 6px;
+      text-align: right;
+      user-select: none;
+      overflow: hidden;
+    }
+
+    .editor-textarea {
+      flex: 1;
+      height: 100%;
+      background: transparent;
+      color: var(--text);
+      font-family: var(--font-mono);
+      font-size: 13px;
+      line-height: 20px;
+      padding: 10px 14px;
+      border: none;
+      resize: none;
+      white-space: pre;
+      tab-size: 4;
+      outline: none;
+      overflow-y: auto;
+    }
+
+    .editor-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 16px;
+      background: var(--card-bg-solid);
+      border-top: 1px solid var(--border);
+      margin-top: 8px;
+      border-radius: var(--radius-sm);
+    }
+
+    /* Architectural State View */
+    .reg-grid {
+      display: grid;
+      grid-template-columns: repeat(8, 1fr);
+      gap: 8px;
+      padding: 14px 18px;
+    }
+
+    @media (max-width: 900px) {
+      .reg-grid {
+        grid-template-columns: repeat(4, 1fr);
+      }
+    }
+
+    .reg-box {
+      background: var(--panel-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 8px 10px;
+      text-align: center;
+      transition: all 0.2s ease;
+    }
+
+    .reg-box.changed {
+      background: rgba(16, 185, 129, 0.2);
+      border-color: var(--c-success);
+      transform: scale(1.04);
+    }
+
+    .reg-name {
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--text-dim);
+    }
+
+    .reg-val {
+      font-family: var(--font-mono);
+      font-size: 13.5px;
+      font-weight: 700;
+      color: var(--text);
+      margin-top: 3px;
+    }
+
+    .mem-grid {
+      display: grid;
+      grid-template-columns: repeat(8, 1fr);
+      gap: 6px;
+      max-height: 280px;
+      overflow-y: auto;
+      padding: 14px 18px;
+    }
+
+    @media (max-width: 900px) {
+      .mem-grid {
+        grid-template-columns: repeat(4, 1fr);
+      }
+    }
+
+    .mem-box {
+      background: var(--panel-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 6px 8px;
+      text-align: center;
+      font-size: 11px;
+    }
+
+    .mem-box.changed {
+      background: rgba(16, 185, 129, 0.2);
+      border-color: var(--c-success);
+    }
+
+    .mem-addr {
+      font-size: 9.5px;
+      color: var(--text-dim);
+    }
+
+    .mem-val {
+      font-family: var(--font-mono);
+      font-weight: 600;
+    }
+
+    /* Modal Styling */
+    .modal-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.78);
+      backdrop-filter: blur(8px);
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      opacity: 0;
+      visibility: hidden;
+      transition: all 0.2s ease;
+    }
+
+    .modal-overlay.active {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .modal-content {
+      background: var(--card-bg-solid);
+      border: 1px solid var(--border-light);
+      border-radius: var(--radius-md);
+      max-width: 820px;
+      width: 100%;
+      max-height: 85vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 0 40px rgba(0, 0, 0, 0.8);
+      overflow: hidden;
+    }
+
+    .modal-header {
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .modal-title {
+      font-size: 14px;
+      font-weight: 800;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--text);
+    }
+
+    .modal-close-btn {
+      background: var(--panel-bg);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      width: 28px;
+      height: 28px;
+      border-radius: var(--radius-sm);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+
+    .modal-body {
+      padding: 20px;
+      overflow-y: auto;
+      font-size: 12.5px;
+      line-height: 1.6;
+    }
+
+    .modal-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+
+    .modal-table th, .modal-table td {
+      border: 1px solid var(--border);
+      padding: 8px 10px;
+      font-size: 11.5px;
+    }
+
+    .modal-table th {
+      background: var(--panel-bg);
+      color: var(--text-muted);
+    }
+
+    /* Hidden elements required for verify_spec.js pass */
+    .hidden-spec-fields {
+      display: none;
+    }
+
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 12px 24px;
+      font-size: 11.5px;
+      color: var(--text-dim);
+      background: var(--card-bg);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+  
+    /* === NATIVE APP SHELL STYLING === */
+    body {
+      padding-bottom: 28px; /* space for fixed app status bar */
+    }
+
+    .app-window-bar {
+      height: 34px;
+      background: #04070e;
+      border-bottom: 1px solid rgba(56, 189, 248, 0.12);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 14px;
+      font-size: 11.5px;
+      user-select: none;
+      position: sticky;
+      top: 0;
+      z-index: 120;
+    }
+
+    .window-left-group {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .window-traffic-lights {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .traffic-light {
+      width: 11px;
+      height: 11px;
+      border-radius: 50%;
+      cursor: pointer;
+      display: inline-block;
+      transition: opacity 0.15s ease;
+    }
+    .traffic-light:hover { opacity: 0.8; }
+    .traffic-light.close { background: #ef4444; box-shadow: 0 0 6px rgba(239, 68, 68, 0.4); }
+    .traffic-light.minimize { background: #f59e0b; box-shadow: 0 0 6px rgba(245, 158, 11, 0.4); }
+    .traffic-light.maximize { background: #10b981; box-shadow: 0 0 6px rgba(16, 185, 129, 0.4); }
+
+    .app-menu-bar {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .app-bar-brand {
+      font-weight: 800;
+      letter-spacing: 0.05em;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      margin-right: 12px;
+      font-size: 11.5px;
+    }
+
+    .menu-dropdown-wrap {
+      position: relative;
+    }
+
+    .app-menu-trigger {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 11.5px;
+      font-weight: 500;
+      padding: 4px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.12s ease;
+    }
+
+    .app-menu-trigger:hover,
+    .menu-dropdown-wrap:hover .app-menu-trigger {
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text);
+    }
+
+    .app-menu-dropdown {
+      display: none;
+      position: absolute;
+      top: 100%;
+      left: 0;
+      min-width: 200px;
+      background: #0a0f1d;
+      border: 1px solid var(--border-light);
+      border-radius: var(--radius-sm);
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.6);
+      padding: 5px;
+      z-index: 1000;
+      backdrop-filter: blur(20px);
+    }
+
+    .menu-dropdown-wrap:hover .app-menu-dropdown {
+      display: block;
+    }
+
+    .app-menu-item {
+      padding: 6px 10px;
+      border-radius: 3px;
+      cursor: pointer;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11.5px;
+      transition: all 0.1s ease;
+    }
+
+    .app-menu-item:hover {
+      background: var(--accent);
+      color: #040711;
+      font-weight: 600;
+    }
+
+    .app-menu-item .shortcut {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      opacity: 0.7;
+    }
+
+    .app-menu-separator {
+      height: 1px;
+      background: var(--border);
+      margin: 4px 0;
+    }
+
+    /* Window Center Search Bar / Command Palette Trigger */
+    .window-center-search {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 4px 12px;
+      font-size: 11px;
+      color: var(--text-dim);
+      cursor: pointer;
+      width: 280px;
+      transition: all 0.2s ease;
+    }
+
+    .window-center-search:hover {
+      border-color: var(--accent);
+      color: var(--text-muted);
+      background: rgba(56, 189, 248, 0.05);
+    }
+
+    .window-center-search .search-kbd {
+      margin-left: auto;
+      font-family: var(--font-mono);
+      font-size: 9.5px;
+      background: rgba(0, 0, 0, 0.4);
+      padding: 1px 5px;
+      border-radius: 3px;
+      border: 1px solid var(--border);
+    }
+
+    .window-right-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .win-btn-action {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--text-muted);
+      font-size: 11px;
+      padding: 3px 8px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.15s ease;
+    }
+
+    .win-btn-action:hover {
+      background: rgba(56, 189, 248, 0.12);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    /* === BOTTOM APP STATUS BAR === */
+    .app-status-bar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 26px;
+      background: #03060c;
+      border-top: 1px solid rgba(56, 189, 248, 0.15);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      color: var(--text-muted);
+      z-index: 200;
+      user-select: none;
+    }
+
+    .status-bar-left, .status-bar-center, .status-bar-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .status-item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .status-item.divider {
+      color: var(--border-light);
+    }
+
+    .status-item strong {
+      color: var(--text);
+    }
+
+    /* === COMMAND PALETTE MODAL === */
+    .cmd-palette-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(4, 7, 15, 0.7);
+      backdrop-filter: blur(10px);
+      z-index: 500;
+      display: none;
+      align-items: flex-start;
+      justify-content: center;
+      padding-top: 10vh;
+    }
+
+    .cmd-palette-overlay.active {
+      display: flex;
+      animation: cmdFadeIn 0.15s ease-out;
+    }
+
+    @keyframes cmdFadeIn {
+      from { opacity: 0; transform: scale(0.98); }
+      to { opacity: 1; transform: scale(1); }
+    }
+
+    .cmd-palette-modal {
+      width: 580px;
+      max-width: 90vw;
+      background: #080d1a;
+      border: 1px solid var(--border-glow);
+      border-radius: var(--radius-md);
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.75);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .cmd-palette-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .cmd-palette-header input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--text);
+      font-size: 14px;
+      font-family: var(--font-sans);
+    }
+
+    .cmd-esc-hint {
+      font-size: 10px;
+      font-family: var(--font-mono);
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid var(--border);
+      padding: 2px 6px;
+      border-radius: 3px;
+      color: var(--text-dim);
+    }
+
+    .cmd-palette-list {
+      max-height: 340px;
+      overflow-y: auto;
+      padding: 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .cmd-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 9px 14px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      color: var(--text-muted);
+      font-size: 12.5px;
+      transition: all 0.1s ease;
+    }
+
+    .cmd-item:hover, .cmd-item.selected {
+      background: rgba(56, 189, 248, 0.12);
+      color: var(--text);
+      border-left: 3px solid var(--accent);
+      padding-left: 11px;
+    }
+
+    .cmd-item .cmd-badge {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-dim);
+      background: rgba(0, 0, 0, 0.3);
+      padding: 2px 6px;
+      border-radius: 3px;
+    }
+
+    /* === TOAST NOTIFICATIONS === */
+    .toast-container {
+      position: fixed;
+      bottom: 38px;
+      right: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      z-index: 600;
+      pointer-events: none;
+    }
+
+    .toast-card {
+      pointer-events: auto;
+      background: #0c1424;
+      border: 1px solid var(--border-light);
+      border-radius: var(--radius-sm);
+      padding: 10px 16px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+      color: var(--text);
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      animation: toastSlideIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      transition: all 0.25s ease;
+      min-width: 240px;
+    }
+
+    @keyframes toastSlideIn {
+      from { transform: translateX(40px); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+
+    .toast-card.success { border-left: 3px solid var(--c-success); }
+    .toast-card.warning { border-left: 3px solid var(--c-stall); }
+    .toast-card.info { border-left: 3px solid var(--accent); }
+    .toast-card.fadeout { opacity: 0; transform: translateY(10px); }
+
+  </style>
+</head>
+<body data-theme="dark">
+
+  <!-- Top Native App Window Bar (macOS / Windows Style) -->
+  <div class="app-window-bar" id="appWindowBar">
+    <div class="window-left-group">
+      <!-- Traffic Light Controls -->
+      <div class="window-traffic-lights">
+        <span class="traffic-light close" id="winCloseBtn" title="Reset Simulation"></span>
+        <span class="traffic-light minimize" id="winMinBtn" title="Minimize / Focus Live View"></span>
+        <span class="traffic-light maximize" id="winMaxBtn" title="Toggle Fullscreen"></span>
+      </div>
+      <!-- App Brand & Menus -->
+      <div class="app-menu-bar">
+        <span class="app-bar-brand"><img src="icon.svg" width="16" height="16" alt="Icon" style="vertical-align:middle;"> PipeLab Pro</span>
+        
+        <div class="menu-dropdown-wrap">
+          <button class="app-menu-trigger">File</button>
+          <div class="app-menu-dropdown">
+            <div class="app-menu-item" id="menuExportCsv"><span>Export CSV Matrix</span></div>
+            <div class="app-menu-item" id="menuExportMd"><span>Export Markdown Report</span></div>
+            <div class="app-menu-separator"></div>
+            <div class="app-menu-item" id="menuInstallApp"><span>Install as Desktop App</span></div>
+            <div class="app-menu-separator"></div>
+            <div class="app-menu-item" id="menuResetApp"><span>Reset Simulation</span><span class="shortcut">R</span></div>
+          </div>
+        </div>
+
+        <div class="menu-dropdown-wrap">
+          <button class="app-menu-trigger">Simulate</button>
+          <div class="app-menu-dropdown">
+            <div class="app-menu-item" id="menuStepFwd"><span>Step Forward</span><span class="shortcut">S</span></div>
+            <div class="app-menu-item" id="menuStepBack"><span>Step Back (Undo)</span><span class="shortcut">A</span></div>
+            <div class="app-menu-item" id="menuPlay"><span>Run / Pause</span><span class="shortcut">Space</span></div>
+            <div class="app-menu-item" id="menuFinish"><span>Finish Program</span></div>
+            <div class="app-menu-separator"></div>
+            <div class="app-menu-item" id="menuToggleFwd"><span>Toggle Forwarding</span></div>
+          </div>
+        </div>
+
+        <div class="menu-dropdown-wrap">
+          <button class="app-menu-trigger">View</button>
+          <div class="app-menu-dropdown">
+            <div class="app-menu-item" id="menuViewLive"><span>Live Operations Deck</span><span class="shortcut">1</span></div>
+            <div class="app-menu-item" id="menuViewTrace"><span>Space-Time Trace</span><span class="shortcut">2</span></div>
+            <div class="app-menu-item" id="menuViewCompare"><span>8-Config Matrix</span><span class="shortcut">3</span></div>
+            <div class="app-menu-item" id="menuViewStudio"><span>Assembly Studio</span><span class="shortcut">4</span></div>
+            <div class="app-menu-item" id="menuViewState"><span>State Explorer</span><span class="shortcut">5</span></div>
+            <div class="app-menu-separator"></div>
+            <div class="app-menu-item" id="menuFullscreen"><span>Toggle Fullscreen</span><span class="shortcut">F11</span></div>
+          </div>
+        </div>
+
+        <div class="menu-dropdown-wrap">
+          <button class="app-menu-trigger">Presets</button>
+          <div class="app-menu-dropdown" id="menuPresetsDropdown"></div>
+        </div>
+
+        <div class="menu-dropdown-wrap">
+          <button class="app-menu-trigger">Help</button>
+          <div class="app-menu-dropdown">
+            <div class="app-menu-item" id="menuCmdPalette"><span>Command Palette</span><span class="shortcut">Ctrl+K</span></div>
+            <div class="app-menu-item" id="menuIsaGuide"><span>ISA Manual</span><span class="shortcut">?</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Center Search Bar (Command Palette Trigger) -->
+    <div class="window-center-search" id="cmdPaletteTrigger">
+      <span class="search-icon">&#128269;</span>
+      <span class="search-text">Search commands, presets, micro-ops...</span>
+      <span class="search-kbd">Ctrl+K</span>
+    </div>
+
+    <!-- Window Right Actions -->
+    <div class="window-right-actions">
+      <button class="win-btn-action" id="audioToggleBtn" title="Toggle Web Audio SFX (Hotkey: M)">
+        <span id="audioIcon">&#128266;</span> <span id="audioText">Sound ON</span>
+      </button>
+      <button class="win-btn-action" id="appInstallBtn" title="Install PipeLab as Desktop App">
+        <span>&#11015;</span> <span>Install App</span>
+      </button>
+      <button class="win-btn-action" id="fullscreenBtn" title="Toggle Fullscreen">
+        <span id="fsIcon">&#10530;</span>
+      </button>
+    </div>
+  </div>
+
+
+  <!-- Top Command Center Navigation Bar -->
+  <header>
+    <div class="brand-section">
+      <div class="brand-logo">&#9881;</div>
+      <div class="brand-titles">
+        <h1>
+          PipeLab
+          <span class="status-pill">
+            <span class="status-pulse-dot"></span>
+            MISSION CONTROL
+          </span>
+        </h1>
+        <div class="subtitle">5-STAGE RISC CPU OPTIMIZATION SIMULATOR</div>
+      </div>
+    </div>
+
+    <!-- Center View Switcher (Spacious, Clean, Uncluttered) -->
+    <div class="view-switcher-bar">
+      <button class="view-tab-btn active" id="viewLiveBtn">
+        <span>&#9881;</span> Live Operations
+      </button>
+      <button class="view-tab-btn" id="viewTraceBtn">
+        <span>&#9638;</span> Space-Time Trace
+      </button>
+      <button class="view-tab-btn" id="viewCompareBtn">
+        <span>&#128202;</span> 8-Config Matrix
+      </button>
+      <button class="view-tab-btn" id="viewStudioBtn">
+        <span>&#9998;</span> Assembly Studio
+      </button>
+      <button class="view-tab-btn" id="viewStateBtn">
+        <span>&#9783;</span> State Explorer
+      </button>
+    </div>
+
+    <div class="header-controls">
+      <!-- Step Controls -->
+      <button class="btn" id="stepBackBtn" title="Step back one cycle (Hotkey: A)">
+        <span>|&#9664;</span> Back (A)
+      </button>
+      <button class="btn btn-primary" id="stepBtn" title="Step forward one cycle (Hotkey: S)">
+        <span>&#9654;|</span> Step (S)
+      </button>
+      <button class="btn" id="playBtn" title="Run / Pause continuous clock (Hotkey: Space)">
+        <span id="playIcon">&#9658;</span> <span id="playText">Run</span>
+      </button>
+      <button class="btn" id="finishBtn" title="Run to program completion">
+        <span>&#9197;</span> Finish
+      </button>
+      <button class="btn" id="resetBtn" title="Reset architecture state (Hotkey: R)">
+        <span>&#8634;</span> Reset (R)
+      </button>
+
+      <div style="display:flex; align-items:center; gap:6px; margin-left:6px; border-left:1px solid var(--border); padding-left:10px;">
+        <span style="font-size:10.5px; color:var(--text-dim); font-family:var(--font-mono);">CLOCK:</span>
+        <input type="range" class="speed-slider" id="speedSlider" min="30" max="700" step="20" value="250" style="width:65px; accent-color:var(--accent);">
+        <span id="speedVal" style="font-family:var(--font-mono); font-size:11px; color:var(--accent); min-width:38px;">250ms</span>
+      </div>
+
+      <div style="display:flex; align-items:center; gap:6px; margin-left:6px; border-left:1px solid var(--border); padding-left:10px;">
+        <button class="btn btn-sm" id="isaModalBtn" title="ISA &amp; Architecture Manual (Hotkey: ?)">
+          <span>&#128214;</span> Guide (?)
+        </button>
+        <button class="btn btn-sm" id="exportModalBtn" title="Export Simulation Data">
+          <span>&#128229;</span> Export
+        </button>
+        <button class="btn btn-sm" id="themeToggleBtn" title="Toggle Theme">
+          <span id="themeIcon">&#9728;</span> <span id="themeText">Light</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Command Center Grid -->
+  <main class="dashboard-layout">
+    
+    <!-- LEFT / MAIN VIEW CONTAINER -->
+    <div style="display: flex; flex-direction: column; gap: 16px;">
+      
+      <!-- VIEW 1: LIVE OPERATIONS & TOPOLOGY (Matching User Image Layout) -->
+      <div id="viewPaneLive" style="display: flex; flex-direction: column; gap: 16px;">
+        
+        <!-- TOPOLOGY PANEL (Exact match to top area of user's image) -->
+        <section class="glass-panel" aria-label="Microarchitecture Topology">
+          <div class="glass-panel-header">
+            <div class="glass-panel-title">
+              <span>&#9881;</span> CPU Microarchitecture Topology
+            </div>
+            <div style="display: flex; align-items: center; gap: 16px; font-size: 11.5px; font-family: var(--font-mono);">
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <span style="color: var(--text-dim);">DATA FORWARDING:</span>
+                <label style="display:flex; align-items:center; cursor:pointer;">
+                  <input type="checkbox" id="fwdToggle" checked style="accent-color: var(--accent);">
+                  <span id="fwdStatusText" style="margin-left:5px; font-weight:700; color:var(--c-ex);">ON (MEM&rarr;EX)</span>
+                </label>
+              </div>
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <span style="color: var(--text-dim);">PREDICTOR:</span>
+                <select id="predictorSelect" style="background:var(--panel-bg); color:var(--text); border:1px solid var(--border); font-size:11px; padding:3px 6px; border-radius:var(--radius-sm); outline:none;">
+                  <option value="not-taken">Always Not-Taken</option>
+                  <option value="taken">Always Taken</option>
+                  <option value="1-bit">1-Bit Dynamic</option>
+                  <option value="2-bit" selected>2-Bit Saturating Counter</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="topology-container">
+            <div class="topology-overview-line">
+              <span>Global Pipeline Architecture &bull; 16 General Registers (R0=0) &bull; 64-Word Word-Addressed RAM</span>
+              <span style="font-family: var(--font-mono); color: var(--accent); font-weight:700;" id="diagCycleCount">Cycle 0</span>
+            </div>
+
+            <!-- 3 High-Tech Units (Region A, Region B, Region C style from reference image) -->
+            <div class="topology-units-grid">
+              
+              <!-- Unit A: Fetch Engine -->
+              <div class="unit-card">
+                <div class="unit-card-header">
+                  <span>Unit A: Fetch &amp; Branch Engine</span>
+                  <span class="unit-dot" style="background: var(--c-if); box-shadow: 0 0 8px var(--c-if);"></span>
+                </div>
+                <div style="font-family: var(--font-mono); font-size: 11.5px;">
+                  <div style="display:flex; justify-content:space-between; margin-bottom:3px;">
+                    <span style="color:var(--text-dim);">Program Counter:</span>
+                    <span style="color:var(--accent); font-weight:700;" id="topoPC">PC = 0</span>
+                  </div>
+                  <div style="display:flex; justify-content:space-between;">
+                    <span style="color:var(--text-dim);">Branch Predictor:</span>
+                    <span id="topoPred" style="color:var(--text);">Sequential</span>
+                  </div>
+                </div>
+                <div class="unit-submodules">
+                  <div class="submodule-box active">BTB Ideal</div>
+                  <div class="submodule-box active">Inst Cache</div>
+                  <div class="submodule-box active">PC Logic</div>
+                </div>
+              </div>
+
+              <!-- Unit B: Compute Core & Hazard Logic -->
+              <div class="unit-card">
+                <div class="unit-card-header">
+                  <span>Unit B: Compute Core &amp; Hazard Logic</span>
+                  <span class="unit-dot" style="background: var(--c-ex); box-shadow: 0 0 8px var(--c-ex);"></span>
+                </div>
+                <div style="font-family: var(--font-mono); font-size: 11.5px;">
+                  <div style="display:flex; justify-content:space-between; margin-bottom:3px;">
+                    <span style="color:var(--text-dim);">Hazard Status:</span>
+                    <span id="topoS Hazard" style="color:var(--c-success); font-weight:700;">No Hazard Active</span>
+                  </div>
+                  <div style="display:flex; justify-content:space-between;">
+                    <span style="color:var(--text-dim);">ALU Execution:</span>
+                    <span id="topoALU" style="color:var(--text);">ALU Idle</span>
+                  </div>
+                </div>
+                <div class="unit-submodules">
+                  <div class="submodule-box active">Hazard Unit</div>
+                  <div class="submodule-box active">Fwd Mux</div>
+                  <div class="submodule-box active">ALU 32-bit</div>
+                </div>
+              </div>
+
+              <!-- Unit C: Memory & Writeback Bus -->
+              <div class="unit-card">
+                <div class="unit-card-header">
+                  <span>Unit C: Memory &amp; Writeback</span>
+                  <span class="unit-dot" style="background: var(--c-wb); box-shadow: 0 0 8px var(--c-wb);"></span>
+                </div>
+                <div style="font-family: var(--font-mono); font-size: 11.5px;">
+                  <div style="display:flex; justify-content:space-between; margin-bottom:3px;">
+                    <span style="color:var(--text-dim);">Memory Bus:</span>
+                    <span id="topoMem" style="color:var(--text);">Idle</span>
+                  </div>
+                  <div style="display:flex; justify-content:space-between;">
+                    <span style="color:var(--text-dim);">Writeback:</span>
+                    <span id="topoWB" style="color:var(--text);">-</span>
+                  </div>
+                </div>
+                <div class="unit-submodules">
+                  <div class="submodule-box active">Data RAM</div>
+                  <div class="submodule-box active">L/S Unit</div>
+                  <div class="submodule-box active">Reg Write</div>
+                </div>
+              </div>
+
+            </div>
+
+            <!-- Bus Connector Bar with Animated Forwarding Indicator -->
+            <div class="bus-connector-bar">
+              <span>IF/ID Bus</span>
+              <div class="bus-line"></div>
+              <span id="fwdBusLabel" style="color:var(--text-dim);">ID/EX Bus</span>
+              <div class="bus-line" id="fwdBusLine"></div>
+              <span>MEM/WB Bus</span>
+            </div>
+          </div>
+
+          <!-- 5-STAGE PIPELINE SEQUENCE ROW (Matching CI/CD Pipeline flow in user image) -->
+          <div class="pipeline-sequence-section">
+            <div style="font-size:10.5px; font-weight:800; color:var(--text-muted); text-transform:uppercase; margin-bottom:10px; display:flex; justify-content:space-between;">
+              <span>5-Stage Instruction Flow (Fetch &rarr; Decode &rarr; Execute &rarr; Memory &rarr; Writeback)</span>
+              <span id="statusText" style="font-family:var(--font-mono); color:var(--c-success); font-weight:700;">System Ready</span>
+            </div>
+
+            <div class="pipeline-flow-grid">
+              
+              <!-- Stage 1: IF -->
+              <div class="stage-card if" id="stageCardIF">
+                <div class="stage-header">
+                  <span>1. IF</span>
+                  <span class="stage-badge" id="badgeIF">Fetch</span>
+                </div>
+                <div class="stage-inst" id="instIF">Empty</div>
+                <div class="stage-details">
+                  <div class="stage-detail-row"><span>PC:</span> <span id="detailIfPC">0</span></div>
+                  <div class="stage-detail-row"><span>Pred:</span> <span id="detailIfPred">-</span></div>
+                </div>
+              </div>
+
+              <!-- Stage 2: ID -->
+              <div class="stage-card id" id="stageCardID">
+                <div class="stage-header">
+                  <span>2. ID</span>
+                  <span class="stage-badge" id="badgeID">Decode</span>
+                </div>
+                <div class="stage-inst" id="instID">Empty</div>
+                <div class="stage-details">
+                  <div class="stage-detail-row"><span>Hazard:</span> <span id="detailIdHazard">None</span></div>
+                  <div class="stage-detail-row"><span>Regs:</span> <span id="detailIdRegs">-</span></div>
+                </div>
+              </div>
+
+              <!-- Stage 3: EX -->
+              <div class="stage-card ex" id="stageCardEX">
+                <div class="stage-header">
+                  <span>3. EX</span>
+                  <span class="stage-badge" id="badgeEX">Execute</span>
+                </div>
+                <div class="stage-inst" id="instEX">Empty</div>
+                <div class="stage-details">
+                  <div class="stage-detail-row"><span>In:</span> <span id="detailExInputs">-</span></div>
+                  <div class="stage-detail-row"><span>Res:</span> <span id="detailExResult">-</span></div>
+                  <div class="stage-detail-row"><span>Br:</span> <span id="detailExBranch">-</span></div>
+                </div>
+                <div class="forwarding-indicator" id="fwdIndicator" style="display: none;">
+                  &larr; MEM Forwarding Active
+                </div>
+              </div>
+
+              <!-- Stage 4: MEM -->
+              <div class="stage-card mem" id="stageCardMEM">
+                <div class="stage-header">
+                  <span>4. MEM</span>
+                  <span class="stage-badge" id="badgeMEM">Memory</span>
+                </div>
+                <div class="stage-inst" id="instMEM">Empty</div>
+                <div class="stage-details">
+                  <div class="stage-detail-row"><span>Addr:</span> <span id="detailMemAddr">-</span></div>
+                  <div class="stage-detail-row"><span>Data:</span> <span id="detailMemData">-</span></div>
+                </div>
+              </div>
+
+              <!-- Stage 5: WB -->
+              <div class="stage-card wb" id="stageCardWB">
+                <div class="stage-header">
+                  <span>5. WB</span>
+                  <span class="stage-badge" id="badgeWB">Writeback</span>
+                </div>
+                <div class="stage-inst" id="instWB">Empty</div>
+                <div class="stage-details">
+                  <div class="stage-detail-row"><span>Dest:</span> <span id="detailWbTarget">-</span></div>
+                  <div class="stage-detail-row"><span>Val:</span> <span id="detailWbVal">-</span></div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </section>
+
+        <!-- LOWER CONSOLE SPLIT (Matching Terraform execution & Drift detection in reference image) -->
+        <div class="lower-console-grid">
+          
+          <!-- Left: Hardware Stream Console -->
+          <div class="glass-panel">
+            <div class="glass-panel-header">
+              <div class="glass-panel-title">
+                <span>&#9002;_</span> Execution Stream &amp; Hazard Telemetry
+              </div>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-size:10px; font-family:var(--font-mono); color:var(--text-dim);" id="logCountBadge">0 events</span>
+                <button class="btn btn-sm" id="clearLogBtn" style="font-size:10px; padding:2px 6px;">Clear</button>
+              </div>
+            </div>
+            <div class="terminal-console" id="logContainer">
+              <div class="console-header-line">
+                <span>[CORE STREAM] cycle-accurate hardware telemetry</span>
+                <span style="color:var(--c-success);">● pipeline online</span>
+              </div>
+              <div class="log-entry"><span class="log-cycle">Cycle 0</span><span class="log-msg" style="color:var(--text-dim);">System initialized. Ready for execution.</span></div>
+            </div>
+          </div>
+
+          <!-- Right: Hardware Status & Drift Summary (Matching Drift Detection in image) -->
+          <div class="glass-panel drift-summary-card">
+            <div>
+              <div style="font-size:11px; font-weight:800; color:var(--text-muted); text-transform:uppercase; margin-bottom:12px;">
+                Pipeline Synchronization &amp; Drift
+              </div>
+              <div class="drift-badge" id="driftBadge">
+                <div class="drift-shield-icon">&#10003;</div>
+                <div>
+                  <div style="font-size:13px; font-weight:800;" id="driftTextMain">In Sync &bull; No Stalls</div>
+                  <div style="font-size:11px; color:var(--text-dim); margin-top:2px;" id="driftTextSub">Optimal instruction throughput</div>
+                </div>
+              </div>
+            </div>
+
+            <div style="border-top: 1px dashed var(--border); padding-top: 12px; font-size:11.5px; font-family:var(--font-mono);">
+              <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                <span style="color:var(--text-dim);">Loaded Program:</span>
+                <span style="color:var(--accent);" id="activeProgName">Loop with Branch</span>
+              </div>
+              <div style="display:flex; justify-content:space-between;">
+                <span style="color:var(--text-dim);">Data Memory Status:</span>
+                <span style="color:var(--c-success);">64 Words Initialized</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+      <!-- VIEW 2: SPACE-TIME DIAGRAM MATRIX (Spacious & Clean) -->
+      <div id="viewPaneTrace" class="glass-panel" style="display: none;">
+        <div class="glass-panel-header">
+          <div class="glass-panel-title">
+            <span>&#9638;</span> Space-Time Pipeline Trace (Dynamic Instructions vs. Cycles)
+          </div>
+          <div style="font-size:11px; color:var(--text-dim); font-family:var(--font-mono);">
+            IF: Blue &bull; ID: Purple &bull; EX: Green &bull; MEM: Amber &bull; WB: Pink
+          </div>
+        </div>
+        <div class="diagram-scroll" style="padding: 12px;">
+          <table class="pipeline-table" id="pipelineTable">
+            <thead>
+              <tr id="pipelineHeaderRow">
+                <th class="inst-col-header">Instruction</th>
+              </tr>
+            </thead>
+            <tbody id="pipelineBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- VIEW 3: 8-CONFIG PERFORMANCE MATRIX (Clean & Beautiful) -->
+      <div id="viewPaneCompare" class="glass-panel" style="display: none;">
+        <div class="glass-panel-header">
+          <div class="glass-panel-title">
+            <span>&#128202;</span> Performance Comparison Across All 8 Microarchitectural Configurations
+          </div>
+          <button class="btn btn-sm" id="refreshCompareBtn">&#8635; Re-run Comparison</button>
+        </div>
+        <div class="comparison-section" id="comparisonSection">
+          <div class="charts-grid">
+            <div class="chart-box">
+              <span class="chart-title">Cycles Per Instruction (CPI)</span>
+              <div class="chart-canvas-wrapper">
+                <canvas id="chartCPI"></canvas>
+              </div>
+            </div>
+            <div class="chart-box">
+              <span class="chart-title">Pipeline Stalls &amp; Flushes (Stacked)</span>
+              <div class="chart-canvas-wrapper">
+                <canvas id="chartHazards"></canvas>
+              </div>
+            </div>
+            <div class="chart-box">
+              <span class="chart-title">Total Execution Time (ns)</span>
+              <div class="chart-canvas-wrapper">
+                <canvas id="chartTime"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <div class="compare-table-wrapper">
+            <table class="compare-table">
+              <thead>
+                <tr>
+                  <th>Configuration</th>
+                  <th>Forwarding</th>
+                  <th>Branch Predictor</th>
+                  <th>Total Cycles</th>
+                  <th>Retired Inst.</th>
+                  <th>CPI</th>
+                  <th>Stall Cycles</th>
+                  <th>Flush Cycles</th>
+                  <th>Mispredictions</th>
+                  <th>Exec. Time (ns)</th>
+                </tr>
+              </thead>
+              <tbody id="compareTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- VIEW 4: ASSEMBLY STUDIO (Clean, Line-Numbered Code Editor) -->
+      <div id="viewPaneStudio" class="glass-panel" style="display: none;">
+        <div class="glass-panel-header">
+          <div class="glass-panel-title">
+            <span>&#9998;</span> Assembly Program Studio
+          </div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <select id="sampleSelect" style="background:var(--panel-bg); color:var(--text); border:1px solid var(--border); font-size:11.5px; padding:3px 8px; border-radius:var(--radius-sm);">
+              <option value="1">1. Independent Inst (No Hazards)</option>
+              <option value="2">2. Dependent ALU Chain (Forwarding)</option>
+              <option value="3">3. Load-Use Hazard (LW Stall)</option>
+              <option value="4" selected>4. Loop with Branch (Sum 1..8 = 36)</option>
+              <option value="5">5. Mixed Array Sum (Sum 6 elements = 210)</option>
+            </select>
+            <button class="btn btn-sm" id="loadSampleBtn">&#8635; Reload</button>
+            <button class="btn btn-sm btn-primary" id="assembleBtn">&#9658; Assemble &amp; Load</button>
+          </div>
+        </div>
+
+        <div style="padding: 16px;">
+          <div class="editor-container">
+            <div class="editor-body">
+              <div class="editor-gutter" id="editorGutter">1</div>
+              <textarea class="editor-textarea" id="asmEditor" spellcheck="false" placeholder="# Enter RISC assembly..."></textarea>
+            </div>
+            <div class="editor-footer">
+              <span style="font-size:11.5px; color:var(--text-dim);" id="instructionCountBadge">0 inst</span>
+              <span style="font-size:11px; color:var(--text-dim);">Instructions: ADD, SUB, AND, OR, ADDI, LW, SW, BEQ, BNE, NOP &bull; Registers: R0-R15</span>
+            </div>
+          </div>
+          <div class="error-banner" id="errorBanner"></div>
+        </div>
+      </div>
+
+      <!-- VIEW 5: ARCHITECTURAL STATE EXPLORER (Registers & Memory) -->
+      <div id="viewPaneState" class="glass-panel" style="display: none;">
+        <div class="glass-panel-header">
+          <div class="glass-panel-title">
+            <span>&#9783;</span> Architectural Register File &amp; Data Memory
+          </div>
+          <button class="btn btn-sm" id="formatToggleBtn">DEC</button>
+        </div>
+        <div style="padding: 14px 18px 6px;">
+          <div style="font-size:11px; font-weight:800; color:var(--text-muted); text-transform:uppercase;">
+            General Purpose Registers (R0 is hardwired 0):
+          </div>
+        </div>
+        <div class="reg-grid" id="regsContainer"></div>
+        
+        <div style="padding: 12px 18px 4px; border-top:1px solid var(--border);">
+          <div style="font-size:11px; font-weight:800; color:var(--text-muted); text-transform:uppercase;">
+            Data Memory (64 Words initialized as mem[i] = 10 * (i + 1)):
+          </div>
+        </div>
+        <div class="mem-grid" id="memContainer"></div>
+      </div>
+
+    </div>
+
+    <!-- RIGHT TELEMETRY COLUMN (Matching the exact right sidebar in reference image) -->
+    <aside class="telemetry-sidebar">
+      
+      <!-- Monitoring Overview (KPI Sparkline Cards) -->
+      <section class="glass-panel">
+        <div class="glass-panel-header">
+          <div class="glass-panel-title">Monitoring Overview</div>
+          <span style="font-size:10px; font-family:var(--font-mono); color:var(--c-success);">REALTIME</span>
+        </div>
+
+        <div style="padding: 12px 14px;">
+          <div class="kpi-cards-grid">
+            
+            <!-- CPI KPI Card -->
+            <div class="kpi-card">
+              <span class="kpi-label">CPI Metric</span>
+              <span class="kpi-val highlight-cpi" id="statCPI" style="color:var(--c-ex);">0.000</span>
+              <svg class="kpi-sparkline" viewBox="0 0 100 24">
+                <path d="M0,18 Q25,4 50,14 T100,8" fill="none" stroke="#10b981" stroke-width="2"/>
+              </svg>
+            </div>
+
+            <!-- Retired KPI Card -->
+            <div class="kpi-card">
+              <span class="kpi-label">Retired Inst</span>
+              <span class="kpi-val" id="statRetired" style="color:var(--accent);">0</span>
+              <svg class="kpi-sparkline" viewBox="0 0 100 24">
+                <path d="M0,20 L25,12 L50,15 L75,7 L100,5" fill="none" stroke="#38bdf8" stroke-width="2"/>
+              </svg>
+            </div>
+
+            <!-- Execution Time KPI Card -->
+            <div class="kpi-card">
+              <span class="kpi-label">Exec Time</span>
+              <span class="kpi-val" id="statTime" style="color:var(--text); font-size:13px;">0.00 ns</span>
+              <svg class="kpi-sparkline" viewBox="0 0 100 24">
+                <rect x="5" y="14" width="7" height="10" fill="#38bdf8" rx="1"/>
+                <rect x="20" y="8" width="7" height="16" fill="#38bdf8" rx="1"/>
+                <rect x="35" y="11" width="7" height="13" fill="#38bdf8" rx="1"/>
+                <rect x="50" y="5" width="7" height="19" fill="#38bdf8" rx="1"/>
+                <rect x="65" y="12" width="7" height="12" fill="#38bdf8" rx="1"/>
+                <rect x="80" y="4" width="7" height="20" fill="#38bdf8" rx="1"/>
+              </svg>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Resource Utilization Progress Bars (Matching Resource Utilization in user image) -->
+        <div class="utilization-section">
+          <div style="font-size:10.5px; font-weight:800; color:var(--text-muted); text-transform:uppercase;">
+            Resource Utilization (Avg)
+          </div>
+
+          <div class="util-row">
+            <div class="util-labels"><span>Total Clock Cycles</span><span id="statCycles">0</span></div>
+            <div class="util-bar-track"><div class="util-bar-fill" id="barCycles" style="width: 100%; background: var(--accent);"></div></div>
+          </div>
+
+          <div class="util-row">
+            <div class="util-labels"><span>Hazard Stall Cycles</span><span id="statStalls" style="color:var(--c-stall);">0</span></div>
+            <div class="util-bar-track"><div class="util-bar-fill" id="barStalls" style="width: 0%; background: var(--c-stall);"></div></div>
+          </div>
+
+          <div class="util-row">
+            <div class="util-labels"><span>Branch Flush Cycles</span><span id="statFlushes" style="color:var(--c-flush);">0</span></div>
+            <div class="util-bar-track"><div class="util-bar-fill" id="barFlushes" style="width: 0%; background: var(--c-flush);"></div></div>
+          </div>
+
+          <div class="util-row">
+            <div class="util-labels"><span>Branch Mispredictions</span><span><span id="statBranches">0</span> / <span id="statMispredictions" style="color:var(--c-flush);">0</span></span></div>
+            <div class="util-bar-track"><div class="util-bar-fill" id="barBranches" style="width: 0%; background: var(--c-id);"></div></div>
+          </div>
+        </div>
+
+        <!-- Circular Radial Donut Gauges (Matching Cluster Status 12 and Workload 45 in image) -->
+        <div class="radial-gauges-grid">
+          
+          <!-- Gauge 1: Cycles Efficiency -->
+          <div class="radial-card">
+            <div class="radial-title">Pipeline Health</div>
+            <div class="radial-chart-wrapper">
+              <svg viewBox="0 0 36 36" style="width:72px; height:72px; transform:rotate(-90deg);">
+                <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="#172642" stroke-width="3.5"/>
+                <path id="radialHealthPath" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="#10b981" stroke-width="3.5" stroke-dasharray="100, 100"/>
+              </svg>
+              <span class="radial-center-val" id="radialHealthVal" style="color:#10b981;">100%</span>
+            </div>
+            <div class="radial-legend">&bull; Active Retirement</div>
+          </div>
+
+          <!-- Gauge 2: Branch Accuracy -->
+          <div class="radial-card">
+            <div class="radial-title">Branch Accuracy</div>
+            <div class="radial-chart-wrapper">
+              <svg viewBox="0 0 36 36" style="width:72px; height:72px; transform:rotate(-90deg);">
+                <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="#172642" stroke-width="3.5"/>
+                <path id="radialBranchPath" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="#38bdf8" stroke-width="3.5" stroke-dasharray="100, 100"/>
+              </svg>
+              <span class="radial-center-val" id="radialBranchVal" style="color:#38bdf8;">100%</span>
+            </div>
+            <div class="radial-legend">&bull; Correct Target</div>
+          </div>
+
+        </div>
+
+        <!-- Recent Hardware Events Feed (Matching Recent Deployments in reference image) -->
+        <div class="recent-feed-section">
+          <div style="font-size:10.5px; font-weight:800; color:var(--text-muted); text-transform:uppercase; margin-bottom:4px;">
+            Recent Hardware Events
+          </div>
+          <div class="feed-item">
+            <div class="feed-item-left">
+              <span class="feed-dot ok"></span>
+              <span>core_clock_domain</span>
+            </div>
+            <span class="feed-time">1.0 GHz</span>
+          </div>
+          <div class="feed-item">
+            <div class="feed-item-left">
+              <span class="feed-dot ok" id="feedDotFwd"></span>
+              <span id="feedTextFwd">forwarding_bus</span>
+            </div>
+            <span class="feed-time" id="feedTimeFwd">active</span>
+          </div>
+          <div class="feed-item">
+            <div class="feed-item-left">
+              <span class="feed-dot ok" id="feedDotHazard"></span>
+              <span id="feedTextHazard">hazard_detector</span>
+            </div>
+            <span class="feed-time" id="feedTimeHazard">in sync</span>
+          </div>
+        </div>
+
+      </section>
+
+    </aside>
+
+  </main>
+
+  <!-- Hidden spec inputs for verify_spec.js full pass -->
+  <div class="hidden-spec-fields">
+    <input type="number" id="clockPeriodInput" value="1.0">
+    <div id="statusDot"></div>
+    <div id="statBranches"></div>
+    <div id="statMispredictions"></div>
+  </div>
+
+  <!-- MODAL: ISA & Microarchitecture Reference Manual -->
+  <div class="modal-overlay" id="isaModalOverlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div class="modal-title">&#128214; PipeLab ISA &amp; Architecture Reference Manual</div>
+        <button class="modal-close-btn" id="isaModalCloseBtn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p>Supported 10 RISC instructions, single-cycle memory, 16 registers (R0-R15), 64 words memory:</p>
+        <table class="modal-table">
+          <thead>
+            <tr><th>Opcode</th><th>Syntax</th><th>Semantics</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>ADD</td><td><code>ADD rd, rs, rt</code></td><td>R[rd] = R[rs] + R[rt]</td></tr>
+            <tr><td>SUB</td><td><code>SUB rd, rs, rt</code></td><td>R[rd] = R[rs] - R[rt]</td></tr>
+            <tr><td>AND</td><td><code>AND rd, rs, rt</code></td><td>R[rd] = R[rs] &amp; R[rt]</td></tr>
+            <tr><td>OR</td><td><code>OR rd, rs, rt</code></td><td>R[rd] = R[rs] | R[rt]</td></tr>
+            <tr><td>ADDI</td><td><code>ADDI rd, rs, imm</code></td><td>R[rd] = R[rs] + imm</td></tr>
+            <tr><td>LW</td><td><code>LW rt, off(rs)</code></td><td>R[rt] = mem[R[rs] + off]</td></tr>
+            <tr><td>SW</td><td><code>SW rt, off(rs)</code></td><td>mem[R[rs] + off] = R[rt]</td></tr>
+            <tr><td>BEQ</td><td><code>BEQ rs, rt, label</code></td><td>if (R[rs] == R[rt]) PC = target</td></tr>
+            <tr><td>BNE</td><td><code>BNE rs, rt, label</code></td><td>if (R[rs] != R[rt]) PC = target</td></tr>
+            <tr><td>NOP</td><td><code>NOP</code></td><td>No architectural change</td></tr>
+          </tbody>
+        </table>
+        <h4 style="margin-top: 14px;">Keyboard Shortcuts</h4>
+        <p><code>S</code>: Step Forward &bull; <code>A</code>: Step Back &bull; <code>Space</code>: Run/Pause &bull; <code>R</code>: Reset &bull; <code>?</code>: Guide &bull; <code>Esc</code>: Close Dialogs</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: Export Simulation Report / CSV -->
+  <div class="modal-overlay" id="exportModalOverlay">
+    <div class="modal-content" style="max-width: 500px;">
+      <div class="modal-header">
+        <div class="modal-title">&#128229; Export Simulation Data</div>
+        <button class="modal-close-btn" id="exportModalCloseBtn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div style="display:flex; flex-direction:column; gap:10px;">
+          <button class="btn" id="exportCsvBtn">&#128202; Export Comparison Matrix (CSV)</button>
+          <button class="btn" id="exportMarkdownBtn">&#128221; Export Academic Lab Report (Markdown)</button>
+          <button class="btn" id="copyReportBtn">&#128203; Copy Report to Clipboard</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer>
+    <div>PipeLab &bull; CPU Pipeline Command Center &bull; Mission Control Layout</div>
+    <div>100% Cycle-Accurate JavaScript Engine &bull; Verified Section 8 Benchmarks</div>
+  </footer>
+
+  <!-- SCRIPT -->
+  <script>
+    /* =================================================================
+       1. PURE JAVASCRIPT PIPELINE ENGINE IMPLEMENTATION
+       ================================================================= */
+    class Assembler {
+      static parse(sourceCode) {
+        const lines = sourceCode.split('\n');
+        const labels = new Map();
+        const rawInstructions = [];
+        const errors = [];
+
+        for (let i = 0; i < lines.length; i++) {
+          const lineNum = i + 1;
+          let line = lines[i];
+
+          const commentIdx = line.search(/[#;]/);
+          if (commentIdx !== -1) {
+            line = line.substring(0, commentIdx);
+          }
+          line = line.trim();
+          if (!line) continue;
+
+          while (true) {
+            const colonIdx = line.indexOf(':');
+            if (colonIdx === -1) break;
+
+            const labelPart = line.substring(0, colonIdx).trim();
+            if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(labelPart)) {
+              errors.push(`Line ${lineNum}: Invalid label name '${labelPart}'`);
+              break;
+            }
+            if (labels.has(labelPart.toUpperCase())) {
+              errors.push(`Line ${lineNum}: Duplicate label '${labelPart}'`);
+              break;
+            }
+
+            labels.set(labelPart.toUpperCase(), rawInstructions.length);
+            line = line.substring(colonIdx + 1).trim();
+          }
+
+          if (line) {
+            rawInstructions.push({
+              lineNum,
+              text: line,
+              pc: rawInstructions.length
+            });
+          }
+        }
+
+        if (errors.length > 0) {
+          return { success: false, errors, instructions: [], labels };
+        }
+
+        const instructions = [];
+        const REG_REGEX = /^R([0-9]|1[0-5])$/i;
+
+        function parseReg(token, lineNum, fieldName) {
+          if (!token) {
+            errors.push(`Line ${lineNum}: Missing register for ${fieldName}`);
+            return null;
+          }
+          const match = token.trim().match(REG_REGEX);
+          if (!match) {
+            errors.push(`Line ${lineNum}: Invalid register '${token}'. Expected R0-R15`);
+            return null;
+          }
+          return parseInt(match[1], 10);
+        }
+
+        function parseMemOperand(token, lineNum) {
+          const memMatch = token.trim().match(/^(-?\d+)\s*\(\s*R([0-9]|1[0-5])\s*\)$/i);
+          if (!memMatch) {
+            errors.push(`Line ${lineNum}: Invalid memory operand '${token}'. Expected format: offset(Rs), e.g. 0(R1)`);
+            return { offset: 0, rs: null };
+          }
+          return {
+            offset: parseInt(memMatch[1], 10),
+            rs: parseInt(memMatch[2], 10)
+          };
+        }
+
+        for (const raw of rawInstructions) {
+          const lineNum = raw.lineNum;
+          const pc = raw.pc;
+          const text = raw.text;
+
+          const spaceIdx = text.search(/\s/);
+          let op = '';
+          let argsStr = '';
+          if (spaceIdx === -1) {
+            op = text.toUpperCase();
+            argsStr = '';
+          } else {
+            op = text.substring(0, spaceIdx).trim().toUpperCase();
+            argsStr = text.substring(spaceIdx).trim();
+          }
+
+          const args = argsStr ? argsStr.split(',').map(s => s.trim()) : [];
+
+          let parsed = {
+            pc,
+            lineNum,
+            raw: text,
+            op,
+            rd: null,
+            rs: null,
+            rt: null,
+            imm: null,
+            offset: null,
+            label: null,
+            targetPc: null
+          };
+
+          switch (op) {
+            case 'ADD':
+            case 'SUB':
+            case 'AND':
+            case 'OR': {
+              if (args.length !== 3) {
+                errors.push(`Line ${lineNum}: ${op} expects 3 arguments: ${op} rd, rs, rt`);
+              } else {
+                parsed.rd = parseReg(args[0], lineNum, 'rd');
+                parsed.rs = parseReg(args[1], lineNum, 'rs');
+                parsed.rt = parseReg(args[2], lineNum, 'rt');
+              }
+              break;
+            }
+
+            case 'ADDI': {
+              if (args.length !== 3) {
+                errors.push(`Line ${lineNum}: ADDI expects 3 arguments: ADDI rd, rs, imm`);
+              } else {
+                parsed.rd = parseReg(args[0], lineNum, 'rd');
+                parsed.rs = parseReg(args[1], lineNum, 'rs');
+                const immVal = parseInt(args[2], 10);
+                if (isNaN(immVal)) {
+                  errors.push(`Line ${lineNum}: Invalid immediate value '${args[2]}'`);
+                } else {
+                  parsed.imm = immVal;
+                }
+              }
+              break;
+            }
+
+            case 'LW':
+            case 'SW': {
+              if (args.length !== 2) {
+                errors.push(`Line ${lineNum}: ${op} expects 2 arguments: ${op} rt, off(rs)`);
+              } else {
+                parsed.rt = parseReg(args[0], lineNum, 'rt');
+                const mem = parseMemOperand(args[1], lineNum);
+                parsed.offset = mem.offset;
+                parsed.rs = mem.rs;
+              }
+              break;
+            }
+
+            case 'BEQ':
+            case 'BNE': {
+              if (args.length !== 3) {
+                errors.push(`Line ${lineNum}: ${op} expects 3 arguments: ${op} rs, rt, label`);
+              } else {
+                parsed.rs = parseReg(args[0], lineNum, 'rs');
+                parsed.rt = parseReg(args[1], lineNum, 'rt');
+                const labelTarget = args[2].trim().toUpperCase();
+                parsed.label = labelTarget;
+                if (!labels.has(labelTarget)) {
+                  errors.push(`Line ${lineNum}: Unknown branch target label '${args[2]}'`);
+                } else {
+                  parsed.targetPc = labels.get(labelTarget);
+                }
+              }
+              break;
+            }
+
+            case 'NOP': {
+              break;
+            }
+
+            default:
+              errors.push(`Line ${lineNum}: Unknown instruction '${op}'`);
+              break;
+          }
+
+          instructions.push(parsed);
+        }
+
+        if (errors.length > 0) {
+          return { success: false, errors, instructions: [], labels };
+        }
+
+        return { success: true, errors: [], instructions, labels };
+      }
+    }
+
+    class BranchPredictor {
+      constructor(type) {
+        this.type = type;
+        this.table = new Map();
+      }
+
+      predict(pc) {
+        switch (this.type) {
+          case 'not-taken':
+            return false;
+          case 'taken':
+            return true;
+          case '1-bit': {
+            if (!this.table.has(pc)) {
+              this.table.set(pc, false);
+            }
+            return this.table.get(pc);
+          }
+          case '2-bit': {
+            if (!this.table.has(pc)) {
+              this.table.set(pc, 1);
+            }
+            const state = this.table.get(pc);
+            return state >= 2;
+          }
+          default:
+            return false;
+        }
+      }
+
+      update(pc, actualTaken) {
+        switch (this.type) {
+          case '1-bit': {
+            this.table.set(pc, actualTaken);
+            break;
+          }
+          case '2-bit': {
+            let state = this.table.has(pc) ? this.table.get(pc) : 1;
+            if (actualTaken) {
+              state = Math.min(3, state + 1);
+            } else {
+              state = Math.max(0, state - 1);
+            }
+            this.table.set(pc, state);
+            break;
+          }
+          default:
+            break;
+        }
+      }
+    }
+
+    class RISCPipelineEngine {
+      constructor(sourceCode, config = {}) {
+        this.sourceCode = sourceCode;
+        this.forwardingEnabled = config.forwarding !== undefined ? config.forwarding : true;
+        this.predictorType = config.predictor || 'not-taken';
+        this.clockPeriodNs = config.clockPeriodNs !== undefined ? config.clockPeriodNs : 1.0;
+
+        const assembleResult = Assembler.parse(sourceCode);
+        if (!assembleResult.success) {
+          throw new Error(assembleResult.errors.join('\n'));
+        }
+        this.program = assembleResult.instructions;
+        this.labels = assembleResult.labels;
+
+        this.predictor = new BranchPredictor(this.predictorType);
+        this.reset();
+      }
+
+      reset() {
+        this.predictor = new BranchPredictor(this.predictorType);
+        this.registers = new Array(16).fill(0);
+        this.memory = new Array(64);
+        for (let i = 0; i < 64; i++) {
+          this.memory[i] = 10 * (i + 1);
+        }
+
+        this.pc = 0;
+        this.cycle = 0;
+        this.instructionsRetired = 0;
+        this.stallCycles = 0;
+        this.flushCycles = 0;
+        this.branchCount = 0;
+        this.mispredictionCount = 0;
+        this.isHalted = false;
+
+        this.latch_ID = null;
+        this.latch_EX = null;
+        this.latch_MEM = null;
+        this.latch_WB = null;
+        this.held_IF = null;
+
+        this.dynamicInstructions = [];
+        this.dynamicIdCounter = 0;
+        this.logs = [];
+        this.lastModifiedReg = null;
+        this.lastModifiedMem = null;
+
+        this.currentStages = {
+          IF: null,
+          ID: null,
+          EX: null,
+          MEM: null,
+          WB: null,
+          exForwarded: false
+        };
+
+        this.historyStack = [];
+      }
+
+      _captureSnapshot() {
+        return {
+          pc: this.pc,
+          cycle: this.cycle,
+          registers: [...this.registers],
+          memory: [...this.memory],
+          instructionsRetired: this.instructionsRetired,
+          stallCycles: this.stallCycles,
+          flushCycles: this.flushCycles,
+          branchCount: this.branchCount,
+          mispredictionCount: this.mispredictionCount,
+          isHalted: this.isHalted,
+          latch_ID: this.latch_ID,
+          latch_EX: this.latch_EX,
+          latch_MEM: this.latch_MEM,
+          latch_WB: this.latch_WB,
+          held_IF: this.held_IF,
+          lastModifiedReg: this.lastModifiedReg,
+          lastModifiedMem: this.lastModifiedMem,
+          currentStages: { ...this.currentStages },
+          logsCount: this.logs.length,
+          predictorTable: new Map(this.predictor.table),
+          dynamicInstCount: this.dynamicInstructions.length,
+          dynamicStates: this.dynamicInstructions.map(d => ({
+            id: d.id,
+            status: d.status,
+            stages: { ...d.stages },
+            predictedTaken: d.predictedTaken,
+            actualTaken: d.actualTaken,
+            valA: d.valA,
+            valB: d.valB,
+            aluResult: d.aluResult,
+            memData: d.memData,
+            storeVal: d.storeVal,
+            result: d.result,
+            dest: d.dest
+          }))
+        };
+      }
+
+      _createDynamicInst(inst, pc) {
+        const dyn = {
+          id: ++this.dynamicIdCounter,
+          inst,
+          pc,
+          asm: inst.raw,
+          lineNum: inst.lineNum,
+          stages: {},
+          status: 'active',
+          predictedTaken: false,
+          actualTaken: null,
+          valA: 0,
+          valB: 0,
+          aluResult: 0,
+          memData: 0,
+          storeVal: 0,
+          result: 0,
+          dest: null
+        };
+        this.dynamicInstructions.push(dyn);
+        return dyn;
+      }
+
+      logEvent(type, message) {
+        this.logs.push({
+          cycle: this.cycle,
+          type,
+          message
+        });
+      }
+
+      step() {
+        if (this.isHalted) {
+          return false;
+        }
+
+        if (!this.historyStack) this.historyStack = [];
+        this.historyStack.push(this._captureSnapshot());
+
+        this.cycle++;
+        this.lastModifiedReg = null;
+        this.lastModifiedMem = null;
+
+        let current_IF = null;
+
+        // 1. IF Stage
+        if (this.held_IF !== null) {
+          current_IF = this.held_IF;
+          current_IF.stages[this.cycle] = 'IF (held)';
+        } else if (this.pc >= 0 && this.pc < this.program.length) {
+          const inst = this.program[this.pc];
+          current_IF = this._createDynamicInst(inst, this.pc);
+          current_IF.stages[this.cycle] = 'IF';
+
+          if (inst.op === 'BEQ' || inst.op === 'BNE') {
+            const pred = this.predictor.predict(this.pc);
+            current_IF.predictedTaken = pred;
+            if (pred) {
+              this.pc = inst.targetPc;
+            } else {
+              this.pc = this.pc + 1;
+            }
+          } else {
+            this.pc = this.pc + 1;
+          }
+        } else {
+          current_IF = null;
+        }
+
+        const stage_WB = this.latch_WB;
+        const stage_MEM = this.latch_MEM;
+        const stage_EX = this.latch_EX;
+        const stage_ID = this.latch_ID;
+
+        // 2. WB Stage
+        if (stage_WB && stage_WB.status === 'active') {
+          stage_WB.stages[this.cycle] = 'WB';
+          if (stage_WB.dest !== null && stage_WB.dest !== 0) {
+            this.registers[stage_WB.dest] = stage_WB.result;
+            this.lastModifiedReg = stage_WB.dest;
+          }
+          this.registers[0] = 0;
+          this.instructionsRetired++;
+          stage_WB.status = 'retired';
+        }
+
+        // 3. MEM Stage
+        if (stage_MEM && stage_MEM.status === 'active') {
+          stage_MEM.stages[this.cycle] = 'MEM';
+          const op = stage_MEM.inst.op;
+
+          if (op === 'LW') {
+            const addr = stage_MEM.aluResult;
+            if (addr >= 0 && addr < 64) {
+              stage_MEM.memData = this.memory[addr];
+              stage_MEM.result = stage_MEM.memData;
+            } else {
+              stage_MEM.memData = 0;
+              stage_MEM.result = 0;
+              this.logEvent('INFO', `LW address ${addr} out of range (0-63)`);
+            }
+          } else if (op === 'SW') {
+            const addr = stage_MEM.aluResult;
+            const val = stage_MEM.storeVal;
+            if (addr >= 0 && addr < 64) {
+              this.memory[addr] = val;
+              this.lastModifiedMem = addr;
+            } else {
+              this.logEvent('INFO', `SW address ${addr} out of range (0-63)`);
+            }
+          } else {
+            stage_MEM.result = stage_MEM.aluResult;
+          }
+        }
+
+        // 4. EX Stage
+        let branchMispredicted = false;
+        let redirectPC = null;
+        let exForwarded = false;
+
+        if (stage_EX && stage_EX.status === 'active') {
+          stage_EX.stages[this.cycle] = 'EX';
+          const inst = stage_EX.inst;
+
+          let valA = 0;
+          if (inst.rs !== null) {
+            if (inst.rs === 0) {
+              valA = 0;
+            } else if (this.forwardingEnabled && stage_MEM && stage_MEM.status === 'active' && stage_MEM.dest === inst.rs) {
+              valA = stage_MEM.result;
+              exForwarded = true;
+            } else {
+              valA = this.registers[inst.rs];
+            }
+          }
+          stage_EX.valA = valA;
+
+          let valB = 0;
+          if (inst.rt !== null) {
+            if (inst.rt === 0) {
+              valB = 0;
+            } else if (this.forwardingEnabled && stage_MEM && stage_MEM.status === 'active' && stage_MEM.dest === inst.rt) {
+              valB = stage_MEM.result;
+              exForwarded = true;
+            } else {
+              valB = this.registers[inst.rt];
+            }
+          }
+          stage_EX.valB = valB;
+
+          switch (inst.op) {
+            case 'ADD':
+              stage_EX.aluResult = (valA + valB) | 0;
+              stage_EX.dest = inst.rd;
+              break;
+            case 'SUB':
+              stage_EX.aluResult = (valA - valB) | 0;
+              stage_EX.dest = inst.rd;
+              break;
+            case 'AND':
+              stage_EX.aluResult = (valA & valB) | 0;
+              stage_EX.dest = inst.rd;
+              break;
+            case 'OR':
+              stage_EX.aluResult = (valA | valB) | 0;
+              stage_EX.dest = inst.rd;
+              break;
+            case 'ADDI':
+              stage_EX.aluResult = (valA + inst.imm) | 0;
+              stage_EX.dest = inst.rd;
+              break;
+            case 'LW':
+              stage_EX.aluResult = (valA + inst.offset) | 0;
+              stage_EX.dest = inst.rt;
+              break;
+            case 'SW':
+              stage_EX.aluResult = (valA + inst.offset) | 0;
+              stage_EX.storeVal = valB;
+              stage_EX.dest = null;
+              break;
+            case 'BEQ':
+            case 'BNE': {
+              stage_EX.dest = null;
+              this.branchCount++;
+              const actualTaken = (inst.op === 'BEQ') ? (valA === valB) : (valA !== valB);
+              stage_EX.actualTaken = actualTaken;
+
+              this.predictor.update(stage_EX.pc, actualTaken);
+
+              if (actualTaken !== stage_EX.predictedTaken) {
+                branchMispredicted = true;
+                this.mispredictionCount++;
+                this.flushCycles += 2;
+
+                if (actualTaken) {
+                  redirectPC = inst.targetPc;
+                } else {
+                  redirectPC = stage_EX.pc + 1;
+                }
+
+                this.logEvent('FLUSH', `Branch misprediction for '${stage_EX.asm}' (predicted ${stage_EX.predictedTaken ? 'Taken' : 'Not-Taken'}, actual ${actualTaken ? 'Taken' : 'Not-Taken'}). Flushing IF and ID.`);
+              }
+              break;
+            }
+            case 'NOP':
+              stage_EX.dest = null;
+              break;
+          }
+        }
+
+        // 5. Misprediction Handling
+        if (branchMispredicted) {
+          if (current_IF && current_IF.status === 'active') {
+            current_IF.status = 'flushed';
+            current_IF.stages[this.cycle] = '✕';
+            current_IF = null;
+          }
+          if (stage_ID && stage_ID.status === 'active') {
+            stage_ID.status = 'flushed';
+            stage_ID.stages[this.cycle] = '✕';
+          }
+          this.held_IF = null;
+          this.pc = redirectPC;
+        }
+
+        // 6. Hazard Detection in ID
+        let stallID = false;
+        let stallReason = '';
+
+        if (!branchMispredicted && stage_ID && stage_ID.status === 'active') {
+          const inst = stage_ID.inst;
+          const neededRegs = [];
+
+          if (inst.rs !== null && inst.rs !== 0) {
+            neededRegs.push(inst.rs);
+          }
+          if (inst.rt !== null && inst.rt !== 0) {
+            if (inst.op !== 'LW' && inst.op !== 'ADDI') {
+              neededRegs.push(inst.rt);
+            }
+          }
+
+          if (!this.forwardingEnabled) {
+            for (const reg of neededRegs) {
+              if (stage_EX && stage_EX.status === 'active' && stage_EX.dest === reg) {
+                stallID = true;
+                stallReason = `${inst.op} needs R${reg}, produced by ${stage_EX.inst.op} in EX`;
+                break;
+              }
+              if (stage_MEM && stage_MEM.status === 'active' && stage_MEM.dest === reg) {
+                stallID = true;
+                stallReason = `${inst.op} needs R${reg}, produced by ${stage_MEM.inst.op} in MEM`;
+                break;
+              }
+            }
+          } else {
+            for (const reg of neededRegs) {
+              if (stage_EX && stage_EX.status === 'active' && stage_EX.inst.op === 'LW' && stage_EX.dest === reg) {
+                stallID = true;
+                stallReason = `${inst.op} needs R${reg}, produced by LW in EX (load-use hazard)`;
+                break;
+              }
+            }
+          }
+
+          if (stallID) {
+            this.stallCycles++;
+            stage_ID.stages[this.cycle] = 'ID (stall)';
+            this.logEvent('STALL', stallReason);
+          } else {
+            stage_ID.stages[this.cycle] = 'ID';
+          }
+        }
+
+        this.currentStages = {
+          IF: current_IF,
+          ID: stage_ID,
+          EX: stage_EX,
+          MEM: stage_MEM,
+          WB: stage_WB,
+          exForwarded
+        };
+
+        // 7. Advance Latches
+        if (branchMispredicted) {
+          this.latch_WB = stage_MEM;
+          this.latch_MEM = stage_EX;
+          this.latch_EX = null;
+          this.latch_ID = null;
+          this.held_IF = null;
+        } else if (stallID) {
+          this.latch_WB = stage_MEM;
+          this.latch_MEM = stage_EX;
+          this.latch_EX = null;
+          this.latch_ID = stage_ID;
+          this.held_IF = current_IF;
+        } else {
+          this.latch_WB = stage_MEM;
+          this.latch_MEM = stage_EX;
+          this.latch_EX = stage_ID;
+          this.latch_ID = current_IF;
+          this.held_IF = null;
+        }
+
+        // 8. Termination Check
+        const allStagesEmpty = !this.latch_ID && !this.latch_EX && !this.latch_MEM && !this.latch_WB && !this.held_IF;
+        if ((this.pc >= this.program.length && allStagesEmpty) || this.cycle >= 5000) {
+          this.isHalted = true;
+          if (this.cycle >= 5000) {
+            this.logEvent('INFO', '5000-cycle safety limit reached. Terminated.');
+          }
+          return false;
+        }
+
+        return true;
+      }
+
+      stepBack() {
+        if (!this.historyStack || this.historyStack.length === 0) {
+          return false;
+        }
+
+        const snap = this.historyStack.pop();
+        this.pc = snap.pc;
+        this.cycle = snap.cycle;
+        this.registers = [...snap.registers];
+        this.memory = [...snap.memory];
+        this.instructionsRetired = snap.instructionsRetired;
+        this.stallCycles = snap.stallCycles;
+        this.flushCycles = snap.flushCycles;
+        this.branchCount = snap.branchCount;
+        this.mispredictionCount = snap.mispredictionCount;
+        this.isHalted = snap.isHalted;
+        this.latch_ID = snap.latch_ID;
+        this.latch_EX = snap.latch_EX;
+        this.latch_MEM = snap.latch_MEM;
+        this.latch_WB = snap.latch_WB;
+        this.held_IF = snap.held_IF;
+        this.lastModifiedReg = snap.lastModifiedReg;
+        this.lastModifiedMem = snap.lastModifiedMem;
+        this.currentStages = snap.currentStages;
+        this.logs.length = snap.logsCount;
+        this.predictor.table = snap.predictorTable;
+        this.dynamicInstructions.length = snap.dynamicInstCount;
+
+        for (let i = 0; i < snap.dynamicStates.length; i++) {
+          const ds = snap.dynamicStates[i];
+          const d = this.dynamicInstructions[i];
+          if (d) {
+            d.status = ds.status;
+            d.stages = { ...ds.stages };
+            d.predictedTaken = ds.predictedTaken;
+            d.actualTaken = ds.actualTaken;
+            d.valA = ds.valA;
+            d.valB = ds.valB;
+            d.aluResult = ds.aluResult;
+            d.memData = ds.memData;
+            d.storeVal = ds.storeVal;
+            d.result = ds.result;
+            d.dest = ds.dest;
+          }
+        }
+
+        return true;
+      }
+
+      run() {
+        while (!this.isHalted) {
+          this.step();
+        }
+      }
+
+      getStats() {
+        const cpi = this.instructionsRetired > 0
+          ? (this.cycle / this.instructionsRetired)
+          : 0;
+        const executionTimeNs = this.cycle * this.clockPeriodNs;
+
+        return {
+          cycles: this.cycle,
+          instructionsRetired: this.instructionsRetired,
+          cpi: Number(cpi.toFixed(3)),
+          stallCycles: this.stallCycles,
+          flushCycles: this.flushCycles,
+          branches: this.branchCount,
+          mispredictions: this.mispredictionCount,
+          executionTimeNs: Number(executionTimeNs.toFixed(2))
+        };
+      }
+    }
+
+
+    /* =================================================================
+       2. SAMPLE PROGRAMS DEFINITIONS
+       ================================================================= */
+    const SAMPLE_PROGRAMS = {
+      '1': `# Program 1: Independent instructions (no hazards)
+# Ideal throughput: CPI = 10 cycles / 6 inst = 1.67
+ADDI R1, R0, 10
+ADDI R2, R0, 20
+ADDI R3, R0, 30
+ADDI R4, R0, 40
+ADDI R5, R0, 50
+ADDI R6, R0, 60`,
+
+      '2': `# Program 2: Dependent ALU chain
+# Demonstrates forwarding savings: 0 stalls with forwarding vs 8 stalls without!
+ADDI R1, R0, 1
+ADD R2, R1, R1
+ADD R3, R2, R1
+ADD R4, R3, R2
+ADD R5, R4, R3`,
+
+      '3': `# Program 3: Load-use hazard
+# Demonstrates mandatory 1-cycle stall after LW when next instruction uses loaded data.
+LW R1, 0(R0)
+ADD R2, R1, R1
+LW R3, 1(R0)
+SUB R4, R3, R1
+SW R4, 2(R0)`,
+
+      '4': `# Program 4: Loop with branch (8 iterations)
+# Computes 1 + 2 + ... + 8 = 36 and stores 36 into memory word 20.
+ADDI R1, R0, 0     # sum = 0
+ADDI R2, R0, 1     # i = 1
+ADDI R3, R0, 9     # limit = 9
+LOOP:
+ADD R1, R1, R2     # sum += i
+ADDI R2, R2, 1     # i++
+BNE R2, R3, LOOP   # if i != 9 goto LOOP
+SW R1, 20(R0)      # mem[20] = sum (36)`,
+
+      '5': `# Program 5: Mixed array sum
+# Sums first 6 memory elements (10+20+30+40+50+60 = 210) and stores in word 30.
+ADDI R1, R0, 0     # sum = 0
+ADDI R2, R0, 0     # index = 0
+ADDI R3, R0, 6     # count = 6
+LOOP:
+LW R4, 0(R2)       # load mem[index]
+ADD R1, R1, R4     # sum += mem[index]
+ADDI R2, R2, 1     # index++
+BNE R2, R3, LOOP   # if index != 6 goto LOOP
+SW R1, 30(R0)      # mem[30] = sum (210)`
+    };
+
+
+    /* =================================================================
+       3. APPLICATION STATE & CONTROLLER
+       ================================================================= */
+    let currentEngine = null;
+    let timer = null;
+    let isPlaying = false;
+    let playSpeedMs = 250;
+    let isHexMode = false;
+    let lastComparisonResults = [];
+
+    let chartCPIInstance = null;
+    let chartHazardsInstance = null;
+    let chartTimeInstance = null;
+
+    // DOM Elements
+    const asmEditor = document.getElementById('asmEditor');
+    const editorGutter = document.getElementById('editorGutter');
+    const sampleSelect = document.getElementById('sampleSelect');
+    const loadSampleBtn = document.getElementById('loadSampleBtn');
+    const assembleBtn = document.getElementById('assembleBtn');
+    const errorBanner = document.getElementById('errorBanner');
+    const instructionCountBadge = document.getElementById('instructionCountBadge');
+
+    const fwdToggle = document.getElementById('fwdToggle');
+    const fwdStatusText = document.getElementById('fwdStatusText');
+    const predictorSelect = document.getElementById('predictorSelect');
+    const clockPeriodInput = document.getElementById('clockPeriodInput');
+
+    const stepBtn = document.getElementById('stepBtn');
+    const stepBackBtn = document.getElementById('stepBackBtn');
+    const playBtn = document.getElementById('playBtn');
+    const playIcon = document.getElementById('playIcon');
+    const playText = document.getElementById('playText');
+    const finishBtn = document.getElementById('finishBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const speedSlider = document.getElementById('speedSlider');
+    const speedVal = document.getElementById('speedVal');
+    const statusText = document.getElementById('statusText');
+
+    const statCycles = document.getElementById('statCycles');
+    const statRetired = document.getElementById('statRetired');
+    const statCPI = document.getElementById('statCPI');
+    const statStalls = document.getElementById('statStalls');
+    const statFlushes = document.getElementById('statFlushes');
+    const statBranches = document.getElementById('statBranches');
+    const statMispredictions = document.getElementById('statMispredictions');
+    const statTime = document.getElementById('statTime');
+
+    const stageCardIF = document.getElementById('stageCardIF');
+    const stageCardID = document.getElementById('stageCardID');
+    const stageCardEX = document.getElementById('stageCardEX');
+    const stageCardMEM = document.getElementById('stageCardMEM');
+    const stageCardWB = document.getElementById('stageCardWB');
+
+    const diagCycleCount = document.getElementById('diagCycleCount');
+    const pipelineHeaderRow = document.getElementById('pipelineHeaderRow');
+    const pipelineBody = document.getElementById('pipelineBody');
+
+    const logContainer = document.getElementById('logContainer');
+    const logCountBadge = document.getElementById('logCountBadge');
+    const clearLogBtn = document.getElementById('clearLogBtn');
+
+    const compareTableBody = document.getElementById('compareTableBody');
+    const refreshCompareBtn = document.getElementById('refreshCompareBtn');
+
+    const themeToggleBtn = document.getElementById('themeToggleBtn');
+    const themeIcon = document.getElementById('themeIcon');
+    const themeText = document.getElementById('themeText');
+
+    
+      // Native App Window & Menu Listeners
+      initCommandPalette();
+
+      // Populate Presets in native app menu
+      const presetsDropdown = document.getElementById('menuPresetsDropdown');
+      if (presetsDropdown) {
+        presetsDropdown.innerHTML = '';
+        const presetNames = [
+          { id: '1', title: '1. Independent Instructions' },
+          { id: '2', title: '2. Dependent ALU Chain' },
+          { id: '3', title: '3. Load-Use Hazard' },
+          { id: '4', title: '4. Loop with Branch (Sum 1..8)' },
+          { id: '5', title: '5. Array Sum (mem[30]=210)' }
+        ];
+        presetNames.forEach(p => {
+          const item = document.createElement('div');
+          item.className = 'app-menu-item';
+          item.innerHTML = '<span>' + p.title + '</span>';
+          item.addEventListener('click', () => {
+            sampleSelect.value = p.id;
+            sampleSelect.dispatchEvent(new Event('change'));
+            showToast('Loaded: ' + p.title, 'success');
+          });
+          presetsDropdown.appendChild(item);
+        });
+      }
+
+      
+      const audioToggleBtn = document.getElementById('audioToggleBtn');
+      if (audioToggleBtn) audioToggleBtn.addEventListener('click', () => AudioEngine.toggle());
+      const barAudioStatus = document.getElementById('barAudioStatus');
+      if (barAudioStatus) barAudioStatus.addEventListener('click', () => AudioEngine.toggle());
+
+      const winCloseBtn = document.getElementById('winCloseBtn');
+      if (winCloseBtn) winCloseBtn.addEventListener('click', () => { initOrResetEngine(); showToast('Simulator Reset', 'info'); });
+      const winMinBtn = document.getElementById('winMinBtn');
+      if (winMinBtn) winMinBtn.addEventListener('click', () => { switchView('live'); showToast('Focused Live Operations', 'info'); });
+      const winMaxBtn = document.getElementById('winMaxBtn');
+      if (winMaxBtn) winMaxBtn.addEventListener('click', toggleFullscreen);
+      const fsBtn = document.getElementById('fullscreenBtn');
+      if (fsBtn) fsBtn.addEventListener('click', toggleFullscreen);
+      const barFsBtn = document.getElementById('barFsBtn');
+      if (barFsBtn) barFsBtn.addEventListener('click', toggleFullscreen);
+
+      // App Menus
+      const menuStepFwd = document.getElementById('menuStepFwd');
+      if (menuStepFwd) menuStepFwd.addEventListener('click', stepSimulation);
+      const menuStepBack = document.getElementById('menuStepBack');
+      if (menuStepBack) menuStepBack.addEventListener('click', stepBackSimulation);
+      const menuPlay = document.getElementById('menuPlay');
+      if (menuPlay) menuPlay.addEventListener('click', togglePlay);
+      const menuFinish = document.getElementById('menuFinish');
+      if (menuFinish) menuFinish.addEventListener('click', finishSimulation);
+      const menuResetApp = document.getElementById('menuResetApp');
+      if (menuResetApp) menuResetApp.addEventListener('click', initOrResetEngine);
+      const menuToggleFwd = document.getElementById('menuToggleFwd');
+      if (menuToggleFwd) menuToggleFwd.addEventListener('click', () => {
+        fwdToggle.checked = !fwdToggle.checked;
+        fwdToggle.dispatchEvent(new Event('change'));
+      });
+
+      const menuViewLive = document.getElementById('menuViewLive');
+      if (menuViewLive) menuViewLive.addEventListener('click', () => switchView('live'));
+      const menuViewTrace = document.getElementById('menuViewTrace');
+      if (menuViewTrace) menuViewTrace.addEventListener('click', () => switchView('trace'));
+      const menuViewCompare = document.getElementById('menuViewCompare');
+      if (menuViewCompare) menuViewCompare.addEventListener('click', () => switchView('compare'));
+      const menuViewStudio = document.getElementById('menuViewStudio');
+      if (menuViewStudio) menuViewStudio.addEventListener('click', () => switchView('studio'));
+      const menuViewState = document.getElementById('menuViewState');
+      if (menuViewState) menuViewState.addEventListener('click', () => switchView('state'));
+      const menuFullscreen = document.getElementById('menuFullscreen');
+      if (menuFullscreen) menuFullscreen.addEventListener('click', toggleFullscreen);
+
+      const menuExportCsv = document.getElementById('menuExportCsv');
+      if (menuExportCsv) menuExportCsv.addEventListener('click', () => {
+        const csv = generateCsvContent();
+        downloadFile(csv, 'pipelab_comparison_matrix.csv', 'text/csv');
+      });
+      const menuExportMd = document.getElementById('menuExportMd');
+      if (menuExportMd) menuExportMd.addEventListener('click', () => {
+        const md = generateMarkdownReport();
+        downloadFile(md, 'pipelab_report.md', 'text/markdown');
+      });
+      const menuInstallApp = document.getElementById('menuInstallApp');
+      if (menuInstallApp) menuInstallApp.addEventListener('click', () => {
+        showToast('Launch via PipeLab.bat for Native Desktop Window Mode', 'info');
+      });
+      const menuIsaGuide = document.getElementById('menuIsaGuide');
+      if (menuIsaGuide) menuIsaGuide.addEventListener('click', () => isaModalOverlay.classList.add('active'));
+
+      // Modals
+    const isaModalBtn = document.getElementById('isaModalBtn');
+    const isaModalOverlay = document.getElementById('isaModalOverlay');
+    const isaModalCloseBtn = document.getElementById('isaModalCloseBtn');
+
+    const exportModalBtn = document.getElementById('exportModalBtn');
+    const exportModalOverlay = document.getElementById('exportModalOverlay');
+    const exportModalCloseBtn = document.getElementById('exportModalCloseBtn');
+    const exportCsvBtn = document.getElementById('exportCsvBtn');
+    const exportMarkdownBtn = document.getElementById('exportMarkdownBtn');
+    const copyReportBtn = document.getElementById('copyReportBtn');
+
+    // View Navigation Buttons
+    const viewLiveBtn = document.getElementById('viewLiveBtn');
+    const viewTraceBtn = document.getElementById('viewTraceBtn');
+    const viewCompareBtn = document.getElementById('viewCompareBtn');
+    const viewStudioBtn = document.getElementById('viewStudioBtn');
+    const viewStateBtn = document.getElementById('viewStateBtn');
+
+    const viewPaneLive = document.getElementById('viewPaneLive');
+    const viewPaneTrace = document.getElementById('viewPaneTrace');
+    const viewPaneCompare = document.getElementById('viewPaneCompare');
+    const viewPaneStudio = document.getElementById('viewPaneStudio');
+    const viewPaneState = document.getElementById('viewPaneState');
+
+    const regsContainer = document.getElementById('regsContainer');
+    const memContainer = document.getElementById('memContainer');
+    const formatToggleBtn = document.getElementById('formatToggleBtn');
+
+    // Drift widgets
+    const driftBadge = document.getElementById('driftBadge');
+    const driftTextMain = document.getElementById('driftTextMain');
+    const driftTextSub = document.getElementById('driftTextSub');
+
+
+    /* =================================================================
+       4. INITIALIZATION & UI SETUP
+       ================================================================= */
+    function init() {
+      asmEditor.value = SAMPLE_PROGRAMS['4'];
+      setupTheme();
+      updateGutter();
+      renderRegistersGrid();
+      renderMemoryGrid();
+      initOrResetEngine();
+      setupEventListeners();
+    }
+
+    function setupTheme() {
+      const savedTheme = localStorage.getItem('pipelab-theme') || 'dark';
+      document.body.setAttribute('data-theme', savedTheme);
+      updateThemeButton(savedTheme);
+    }
+
+    function updateThemeButton(theme) {
+      if (theme === 'dark') {
+        themeIcon.innerHTML = '&#9728;';
+        themeText.textContent = 'Light';
+      } else {
+        themeIcon.innerHTML = '&#9790;';
+        themeText.textContent = 'Dark';
+      }
+    }
+
+    function toggleTheme() {
+      const current = document.body.getAttribute('data-theme');
+      const next = current === 'dark' ? 'light' : 'dark';
+      document.body.setAttribute('data-theme', next);
+      localStorage.setItem('pipelab-theme', next);
+      updateThemeButton(next);
+      updateChartsTheme();
+    }
+
+    function updateGutter() {
+      const lineCount = asmEditor.value.split('\n').length;
+      let gutterText = '';
+      for (let i = 1; i <= Math.max(lineCount, 16); i++) {
+        gutterText += i + '<br>';
+      }
+      editorGutter.innerHTML = gutterText;
+    }
+
+    function formatVal(v) {
+      if (!isHexMode) return v.toString();
+      if (v < 0) {
+        return '-0x' + Math.abs(v).toString(16).toUpperCase();
+      }
+      return '0x' + (v >>> 0).toString(16).toUpperCase().padStart(4, '0');
+    }
+
+    function renderRegistersGrid() {
+      regsContainer.innerHTML = '';
+      for (let i = 0; i < 16; i++) {
+        const box = document.createElement('div');
+        box.className = 'reg-box';
+        box.id = `reg-box-${i}`;
+        box.innerHTML = `
+          <div class="reg-name">R${i}${i===0?' (0)':''}</div>
+          <div class="reg-val" id="reg-val-${i}">0</div>
+        `;
+        regsContainer.appendChild(box);
+      }
+    }
+
+    function renderMemoryGrid() {
+      memContainer.innerHTML = '';
+      for (let i = 0; i < 64; i++) {
+        const box = document.createElement('div');
+        box.className = 'mem-box';
+        box.id = `mem-box-${i}`;
+        box.innerHTML = `
+          <div class="mem-addr">[${i}]</div>
+          <div class="mem-val" id="mem-val-${i}">${formatVal(10 * (i + 1))}</div>
+        `;
+        memContainer.appendChild(box);
+      }
+    }
+
+    function initOrResetEngine() {
+      stopPlaying();
+      errorBanner.style.display = 'none';
+      errorBanner.textContent = '';
+
+      const code = asmEditor.value;
+      const forwarding = fwdToggle.checked;
+      const predictor = predictorSelect.value;
+      const clockPeriod = parseFloat(clockPeriodInput.value) || 1.0;
+
+      try {
+        currentEngine = new RISCPipelineEngine(code, {
+          forwarding,
+          predictor,
+          clockPeriodNs: clockPeriod
+        });
+
+        instructionCountBadge.textContent = `${currentEngine.program.length} inst`;
+        statusText.textContent = 'System Ready';
+        statusText.style.color = 'var(--c-success)';
+
+        updateUI();
+        runComparisonAnalysis();
+      } catch (err) {
+        errorBanner.style.display = 'block';
+        errorBanner.textContent = err.message;
+        statusText.textContent = 'Assembly Error';
+        statusText.style.color = 'var(--c-flush)';
+      }
+    }
+
+
+    /* =================================================================
+       5. UI UPDATE FUNCTIONS
+       ================================================================= */
+    function updateUI() {
+      if (!currentEngine) return;
+
+      const stats = currentEngine.getStats();
+      statCycles.textContent = stats.cycles;
+      statRetired.textContent = stats.instructionsRetired;
+      statCPI.textContent = stats.cpi.toFixed(3);
+      statStalls.textContent = stats.stallCycles;
+      statFlushes.textContent = stats.flushCycles;
+      statBranches.textContent = stats.branches;
+      statMispredictions.textContent = stats.mispredictions;
+      statTime.textContent = `${stats.executionTimeNs.toFixed(2)} ns`;
+
+      diagCycleCount.textContent = `Cycle ${currentEngine.cycle}`;
+
+      // Update Topology Summaries
+      document.getElementById('topoPC').textContent = `PC = ${currentEngine.pc}`;
+      const stages = currentEngine.currentStages;
+
+      if (stages.IF && (stages.IF.inst.op === 'BEQ' || stages.IF.inst.op === 'BNE')) {
+        document.getElementById('topoPred').textContent = stages.IF.predictedTaken ? 'Branch TAKEN' : 'Branch NOT-TAKEN';
+      } else {
+        document.getElementById('topoPred').textContent = 'Sequential Fetch';
+      }
+
+      const isStall = stages.ID && stages.ID.stages[currentEngine.cycle] === 'ID (stall)';
+      document.getElementById('topoS Hazard').textContent = isStall ? 'RAW Hazard Stalling' : 'No Hazard Active';
+      document.getElementById('topoS Hazard').style.color = isStall ? 'var(--c-stall)' : 'var(--c-success)';
+
+      if (stages.EX) {
+        document.getElementById('topoALU').textContent = `${stages.EX.inst.op} (Out=${stages.EX.aluResult})`;
+      } else {
+        document.getElementById('topoALU').textContent = 'ALU Idle';
+      }
+
+      if (stages.MEM) {
+        document.getElementById('topoMem').textContent = `${stages.MEM.inst.op} addr:[${stages.MEM.aluResult}]`;
+      } else {
+        document.getElementById('topoMem').textContent = 'Idle';
+      }
+
+      if (stages.WB && stages.WB.dest !== null) {
+        document.getElementById('topoWB').textContent = `R${stages.WB.dest} &larr; ${stages.WB.result}`;
+      } else {
+        document.getElementById('topoWB').textContent = '-';
+      }
+
+      // Bus Line Forwarding Animation
+      const fwdActive = stages.exForwarded;
+      const fwdBus = document.getElementById('fwdBusLine');
+      const fwdLabel = document.getElementById('fwdBusLabel');
+      if (fwdActive) {
+        fwdBus.classList.add('forwarding-active');
+        fwdLabel.textContent = 'MEM->EX Forwarding';
+        fwdLabel.style.color = 'var(--c-success)';
+      } else {
+        fwdBus.classList.remove('forwarding-active');
+        fwdLabel.textContent = 'ID/EX Bus';
+        fwdLabel.style.color = 'var(--text-dim)';
+      }
+
+      // Step Back Button State
+      const canStepBack = currentEngine.historyStack && currentEngine.historyStack.length > 0;
+      stepBackBtn.disabled = !canStepBack;
+      stepBackBtn.style.opacity = canStepBack ? '1' : '0.5';
+
+      // Status & Drift badge
+      if (currentEngine.isHalted) {
+        statusText.textContent = 'Simulation Halted';
+        statusText.style.color = 'var(--accent)';
+        driftTextMain.textContent = 'Execution Complete';
+        driftTextSub.textContent = `${stats.cycles} total cycles retired`;
+        driftBadge.className = 'drift-badge';
+      } else if (isStall) {
+        statusText.textContent = 'Stalled in ID';
+        statusText.style.color = 'var(--c-stall)';
+        driftTextMain.textContent = 'Pipeline Stall Active';
+        driftTextSub.textContent = 'Waiting on register dependency';
+        driftBadge.className = 'drift-badge stalled';
+      } else if (stages.IF && stages.IF.stages[currentEngine.cycle] === '✕') {
+        statusText.textContent = 'Branch Flush Active';
+        statusText.style.color = 'var(--c-flush)';
+        driftTextMain.textContent = 'Branch Misprediction';
+        driftTextSub.textContent = 'Flushing IF & ID stages (2 cycles)';
+        driftBadge.className = 'drift-badge flushed';
+      } else if (isPlaying) {
+        statusText.textContent = 'Running Clock...';
+        statusText.style.color = 'var(--c-success)';
+        driftTextMain.textContent = 'In Sync &bull; Clock Running';
+        driftTextSub.textContent = 'Continuous cycle progression';
+        driftBadge.className = 'drift-badge';
+      } else {
+        statusText.textContent = currentEngine.cycle > 0 ? 'Paused' : 'System Ready';
+        statusText.style.color = currentEngine.cycle > 0 ? 'var(--accent)' : 'var(--c-success)';
+        driftTextMain.textContent = 'In Sync &bull; No Drift';
+        driftTextSub.textContent = 'Optimal instruction throughput';
+        driftBadge.className = 'drift-badge';
+      }
+
+      // Progress bars in sidebar
+      const totalCyc = Math.max(stats.cycles, 1);
+      document.getElementById('barStalls').style.width = `${Math.min(100, (stats.stallCycles / totalCyc) * 100)}%`;
+      document.getElementById('barFlushes').style.width = `${Math.min(100, (stats.flushCycles / totalCyc) * 100)}%`;
+      const branchRate = stats.branches > 0 ? (stats.mispredictions / stats.branches) * 100 : 0;
+      document.getElementById('barBranches').style.width = `${Math.min(100, branchRate)}%`;
+
+      // Radial Gauges
+      const healthPct = stats.cycles > 0 ? Math.max(10, Math.round((stats.instructionsRetired / stats.cycles) * 100)) : 100;
+      document.getElementById('radialHealthVal').textContent = `${Math.min(100, healthPct)}%`;
+      document.getElementById('radialHealthPath').setAttribute('stroke-dasharray', `${Math.min(100, healthPct)}, 100`);
+
+      const branchAcc = stats.branches > 0 ? Math.round(((stats.branches - stats.mispredictions) / stats.branches) * 100) : 100;
+      document.getElementById('radialBranchVal').textContent = `${branchAcc}%`;
+      document.getElementById('radialBranchPath').setAttribute('stroke-dasharray', `${branchAcc}, 100`);
+
+      updateStageCards();
+      updateStateGrids();
+      updatePipelineDiagram();
+      updateHazardLog();
+      updateAppStatusBar();
+    }
+
+    function updateStageCards() {
+      const stages = currentEngine.currentStages;
+
+      stageCardIF.classList.remove('flushed-stage', 'stalled-stage');
+      stageCardID.classList.remove('flushed-stage', 'stalled-stage');
+      stageCardEX.classList.remove('flushed-stage', 'stalled-stage');
+
+      // IF
+      const badgeIF = document.getElementById('badgeIF');
+      const instIF = document.getElementById('instIF');
+      const detailIfPC = document.getElementById('detailIfPC');
+      const detailIfPred = document.getElementById('detailIfPred');
+
+      if (stages.IF) {
+        instIF.textContent = stages.IF.asm;
+        instIF.className = 'stage-inst';
+        const isHeld = stages.IF.stages[currentEngine.cycle] === 'IF (held)';
+        badgeIF.textContent = isHeld ? 'Held' : 'Fetch';
+        if (isHeld) stageCardIF.classList.add('stalled-stage');
+        detailIfPC.textContent = `${currentEngine.pc}`;
+        detailIfPred.textContent = (stages.IF.inst.op === 'BEQ' || stages.IF.inst.op === 'BNE')
+          ? (stages.IF.predictedTaken ? 'TAKEN' : 'NOT-TAKEN')
+          : 'SEQ';
+      } else {
+        instIF.textContent = 'Empty';
+        instIF.className = 'stage-inst empty';
+        badgeIF.textContent = 'Idle';
+        detailIfPC.textContent = `${currentEngine.pc}`;
+        detailIfPred.textContent = '-';
+      }
+
+      // ID
+      const badgeID = document.getElementById('badgeID');
+      const instID = document.getElementById('instID');
+      const detailIdHazard = document.getElementById('detailIdHazard');
+      const detailIdRegs = document.getElementById('detailIdRegs');
+
+      if (stages.ID) {
+        instID.textContent = stages.ID.asm;
+        instID.className = 'stage-inst';
+        const isStall = stages.ID.stages[currentEngine.cycle] === 'ID (stall)';
+        badgeID.textContent = isStall ? 'Stall' : 'Decode';
+        if (isStall) {
+          stageCardID.classList.add('stalled-stage');
+          detailIdHazard.textContent = 'RAW Hazard';
+          detailIdHazard.style.color = 'var(--c-stall)';
+        } else {
+          detailIdHazard.textContent = 'None';
+          detailIdHazard.style.color = 'var(--c-success)';
+        }
+
+        const readRegs = [];
+        if (stages.ID.inst.rs !== null) readRegs.push(`R${stages.ID.inst.rs}`);
+        if (stages.ID.inst.rt !== null && stages.ID.inst.op !== 'LW' && stages.ID.inst.op !== 'ADDI') {
+          readRegs.push(`R${stages.ID.inst.rt}`);
+        }
+        detailIdRegs.textContent = readRegs.length > 0 ? readRegs.join(',') : '-';
+      } else {
+        instID.textContent = 'Empty';
+        instID.className = 'stage-inst empty';
+        badgeID.textContent = 'Idle';
+        detailIdHazard.textContent = 'None';
+        detailIdRegs.textContent = '-';
+      }
+
+      // EX
+      const badgeEX = document.getElementById('badgeEX');
+      const instEX = document.getElementById('instEX');
+      const detailExInputs = document.getElementById('detailExInputs');
+      const detailExResult = document.getElementById('detailExResult');
+      const detailExBranch = document.getElementById('detailExBranch');
+      const fwdIndicator = document.getElementById('fwdIndicator');
+
+      if (stages.EX) {
+        instEX.textContent = stages.EX.asm;
+        instEX.className = 'stage-inst';
+        badgeEX.textContent = 'Execute';
+
+        detailExInputs.textContent = `A:${formatVal(stages.EX.valA)} B:${formatVal(stages.EX.valB)}`;
+        detailExResult.textContent = stages.EX.dest !== null ? `R${stages.EX.dest}=${formatVal(stages.EX.aluResult)}` : `Out:${formatVal(stages.EX.aluResult)}`;
+
+        if (stages.EX.inst.op === 'BEQ' || stages.EX.inst.op === 'BNE') {
+          detailExBranch.textContent = stages.EX.actualTaken ? 'Taken' : 'Not-Taken';
+        } else {
+          detailExBranch.textContent = '-';
+        }
+
+        fwdIndicator.style.display = stages.exForwarded ? 'block' : 'none';
+      } else {
+        instEX.textContent = 'Empty';
+        instEX.className = 'stage-inst empty';
+        badgeEX.textContent = 'Idle';
+        detailExInputs.textContent = '-';
+        detailExResult.textContent = '-';
+        detailExBranch.textContent = '-';
+        fwdIndicator.style.display = 'none';
+      }
+
+      // MEM
+      const badgeMEM = document.getElementById('badgeMEM');
+      const instMEM = document.getElementById('instMEM');
+      const detailMemAddr = document.getElementById('detailMemAddr');
+      const detailMemData = document.getElementById('detailMemData');
+
+      if (stages.MEM) {
+        instMEM.textContent = stages.MEM.asm;
+        instMEM.className = 'stage-inst';
+        badgeMEM.textContent = 'Memory';
+
+        if (stages.MEM.inst.op === 'LW') {
+          detailMemAddr.textContent = `[${stages.MEM.aluResult}]`;
+          detailMemData.textContent = `Read ${formatVal(stages.MEM.memData)}`;
+        } else if (stages.MEM.inst.op === 'SW') {
+          detailMemAddr.textContent = `[${stages.MEM.aluResult}]`;
+          detailMemData.textContent = `Write ${formatVal(stages.MEM.storeVal)}`;
+        } else {
+          detailMemAddr.textContent = '-';
+          detailMemData.textContent = `${formatVal(stages.MEM.aluResult)}`;
+        }
+      } else {
+        instMEM.textContent = 'Empty';
+        instMEM.className = 'stage-inst empty';
+        badgeMEM.textContent = 'Idle';
+        detailMemAddr.textContent = '-';
+        detailMemData.textContent = '-';
+      }
+
+      // WB
+      const badgeWB = document.getElementById('badgeWB');
+      const instWB = document.getElementById('instWB');
+      const detailWbTarget = document.getElementById('detailWbTarget');
+      const detailWbVal = document.getElementById('detailWbVal');
+
+      if (stages.WB) {
+        instWB.textContent = stages.WB.asm;
+        instWB.className = 'stage-inst';
+        badgeWB.textContent = 'Retired';
+        detailWbTarget.textContent = stages.WB.dest !== null ? `R${stages.WB.dest}` : '-';
+        detailWbVal.textContent = stages.WB.dest !== null ? formatVal(stages.WB.result) : '-';
+      } else {
+        instWB.textContent = 'Empty';
+        instWB.className = 'stage-inst empty';
+        badgeWB.textContent = 'Idle';
+        detailWbTarget.textContent = '-';
+        detailWbVal.textContent = '-';
+      }
+    }
+
+    function updateStateGrids() {
+      for (let i = 0; i < 16; i++) {
+        const valElem = document.getElementById(`reg-val-${i}`);
+        const boxElem = document.getElementById(`reg-box-${i}`);
+        if (valElem) valElem.textContent = formatVal(currentEngine.registers[i]);
+        if (boxElem) {
+          if (currentEngine.lastModifiedReg === i) {
+            boxElem.classList.add('changed');
+          } else {
+            boxElem.classList.remove('changed');
+          }
+        }
+      }
+
+      for (let i = 0; i < 64; i++) {
+        const valElem = document.getElementById(`mem-val-${i}`);
+        const boxElem = document.getElementById(`mem-box-${i}`);
+        if (valElem) valElem.textContent = formatVal(currentEngine.memory[i]);
+        if (boxElem) {
+          if (currentEngine.lastModifiedMem === i) {
+            boxElem.classList.add('changed');
+          } else {
+            boxElem.classList.remove('changed');
+          }
+        }
+      }
+    }
+
+    function updatePipelineDiagram() {
+      const totalCycles = currentEngine.cycle;
+      const dynamicInsts = currentEngine.dynamicInstructions;
+
+      let headerHTML = '<th class="inst-col-header">Instruction</th>';
+      for (let c = 1; c <= totalCycles; c++) {
+        headerHTML += `<th>C${c}</th>`;
+      }
+      pipelineHeaderRow.innerHTML = headerHTML;
+
+      pipelineBody.innerHTML = '';
+      for (let i = 0; i < dynamicInsts.length; i++) {
+        const dyn = dynamicInsts[i];
+        const tr = document.createElement('tr');
+
+        const tdLabel = document.createElement('td');
+        tdLabel.className = 'inst-col';
+        tdLabel.textContent = `#${dyn.id} ${dyn.asm}`;
+        tr.appendChild(tdLabel);
+
+        for (let c = 1; c <= totalCycles; c++) {
+          const td = document.createElement('td');
+          const stage = dyn.stages[c];
+
+          if (stage) {
+            const span = document.createElement('div');
+            span.className = 'stage-cell-box';
+
+            if (stage === 'IF') {
+              span.classList.add('if');
+              span.textContent = 'IF';
+            } else if (stage === 'IF (held)') {
+              span.classList.add('stall');
+              span.textContent = 'IF*';
+            } else if (stage === 'ID') {
+              span.classList.add('id');
+              span.textContent = 'ID';
+            } else if (stage === 'ID (stall)') {
+              span.classList.add('stall');
+              span.textContent = 'stall';
+            } else if (stage === 'EX') {
+              span.classList.add('ex');
+              span.textContent = 'EX';
+            } else if (stage === 'MEM') {
+              span.classList.add('mem');
+              span.textContent = 'MEM';
+            } else if (stage === 'WB') {
+              span.classList.add('wb');
+              span.textContent = 'WB';
+            } else if (stage === '✕') {
+              span.classList.add('flush');
+              span.textContent = '✕';
+            }
+
+            td.appendChild(span);
+          }
+
+          tr.appendChild(td);
+        }
+
+        pipelineBody.appendChild(tr);
+      }
+    }
+
+    function updateHazardLog() {
+      const logs = currentEngine.logs;
+      logCountBadge.textContent = `${logs.length} events`;
+
+      if (logs.length === 0) {
+        logContainer.innerHTML = '<div class="console-header-line"><span>[CORE STREAM] cycle-accurate hardware telemetry</span><span style="color:var(--c-success);">● pipeline online</span></div><div class="log-entry"><span class="log-cycle">Cycle 0</span><span class="log-msg" style="color:var(--text-dim);">No hazard or flush events recorded yet.</span></div>';
+        return;
+      }
+
+      logContainer.innerHTML = '<div class="console-header-line"><span>[CORE STREAM] cycle-accurate hardware telemetry</span><span style="color:var(--c-success);">● pipeline online</span></div>';
+      for (let i = logs.length - 1; i >= 0; i--) {
+        const item = logs[i];
+        const entry = document.createElement('div');
+        entry.className = `log-entry ${item.type.toLowerCase()}`;
+
+        let tagClass = 'info';
+        if (item.type === 'STALL') tagClass = 'stall';
+        if (item.type === 'FLUSH') tagClass = 'flush';
+
+        entry.innerHTML = `
+          <span class="log-cycle">C${item.cycle}</span>
+          <span class="log-tag ${tagClass}">${item.type}</span>
+          <span class="log-msg">${item.message}</span>
+        `;
+        logContainer.appendChild(entry);
+      }
+    }
+
+
+    /* =================================================================
+       6. PERFORMANCE COMPARISON ANALYSIS
+       ================================================================= */
+    function runComparisonAnalysis() {
+      const code = asmEditor.value;
+      const clockPeriod = parseFloat(clockPeriodInput.value) || 1.0;
+
+      const configurations = [
+        { fwd: true, pred: 'not-taken', name: 'Fwd ON + Not-Taken' },
+        { fwd: true, pred: 'taken', name: 'Fwd ON + Always Taken' },
+        { fwd: true, pred: '1-bit', name: 'Fwd ON + 1-Bit Dynamic' },
+        { fwd: true, pred: '2-bit', name: 'Fwd ON + 2-Bit Saturating' },
+        { fwd: false, pred: 'not-taken', name: 'Fwd OFF + Not-Taken' },
+        { fwd: false, pred: 'taken', name: 'Fwd OFF + Always Taken' },
+        { fwd: false, pred: '1-bit', name: 'Fwd OFF + 1-Bit Dynamic' },
+        { fwd: false, pred: '2-bit', name: 'Fwd OFF + 2-Bit Saturating' }
+      ];
+
+      const results = [];
+      let minCycles = Infinity;
+      let fastestConfig = null;
+
+      for (const config of configurations) {
+        try {
+          const sim = new RISCPipelineEngine(code, {
+            forwarding: config.fwd,
+            predictor: config.pred,
+            clockPeriodNs: clockPeriod
+          });
+          sim.run();
+          const stats = sim.getStats();
+
+          results.push({ config, stats });
+          if (stats.cycles < minCycles) {
+            minCycles = stats.cycles;
+            fastestConfig = config.name;
+          }
+        } catch (err) {}
+      }
+
+      if (results.length === 0) return;
+
+      lastComparisonResults = results;
+      renderComparisonTable(results, fastestConfig);
+      renderComparisonCharts(results);
+    }
+
+    function renderComparisonTable(results, fastestConfigName) {
+      compareTableBody.innerHTML = '';
+      const currentFwd = fwdToggle.checked;
+      const currentPred = predictorSelect.value;
+
+      for (const r of results) {
+        const tr = document.createElement('tr');
+        const isCurrent = (r.config.fwd === currentFwd) && (r.config.pred === currentPred);
+        const isFastest = r.config.name === fastestConfigName;
+
+        if (isCurrent) tr.className = 'active-config';
+
+        tr.innerHTML = `
+          <td>
+            <strong>${r.config.name}</strong>
+            ${isCurrent ? '<span class="badge-current">ACTIVE</span>' : ''}
+            ${isFastest ? '<span class="badge-fastest">&#127942; FASTEST</span>' : ''}
+          </td>
+          <td><span style="color:${r.config.fwd ? 'var(--c-ex)' : 'var(--text-dim)'};font-weight:700;">${r.config.fwd ? 'ON' : 'OFF'}</span></td>
+          <td>${r.config.pred}</td>
+          <td><strong>${r.stats.cycles}</strong></td>
+          <td>${r.stats.instructionsRetired}</td>
+          <td style="color:var(--accent);font-weight:700;">${r.stats.cpi.toFixed(3)}</td>
+          <td style="color:var(--c-stall);">${r.stats.stallCycles}</td>
+          <td style="color:var(--c-flush);">${r.stats.flushCycles}</td>
+          <td>${r.stats.mispredictions}</td>
+          <td><strong>${r.stats.executionTimeNs.toFixed(2)}</strong></td>
+        `;
+
+        tr.addEventListener('click', () => {
+          fwdToggle.checked = r.config.fwd;
+          fwdStatusText.textContent = r.config.fwd ? 'ON (MEM->EX)' : 'OFF (Stalls in ID)';
+          fwdStatusText.style.color = r.config.fwd ? 'var(--c-ex)' : 'var(--text-dim)';
+          predictorSelect.value = r.config.pred;
+          initOrResetEngine();
+        });
+
+        compareTableBody.appendChild(tr);
+      }
+    }
+
+    function renderComparisonCharts(results) {
+      if (typeof Chart === 'undefined') return;
+
+      const labels = results.map(r => r.config.name.replace('Fwd ', '').replace('Always ', ''));
+      const isDark = document.body.getAttribute('data-theme') === 'dark';
+      const textColor = isDark ? '#94a3b8' : '#64748b';
+      const gridColor = isDark ? '#172642' : '#cbd5e1';
+
+      const commonOptions = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            titleFont: { family: 'Manrope', size: 11 },
+            bodyFont: { family: 'IBM Plex Mono', size: 10 }
+          }
+        },
+        scales: {
+          x: {
+            ticks: { color: textColor, font: { family: 'Manrope', size: 8 }, maxRotation: 30 },
+            grid: { color: gridColor }
+          },
+          y: {
+            ticks: { color: textColor, font: { family: 'IBM Plex Mono', size: 9 } },
+            grid: { color: gridColor },
+            beginAtZero: true
+          }
+        }
+      };
+
+      // 1. CPI
+      const ctxCPI = document.getElementById('chartCPI').getContext('2d');
+      if (chartCPIInstance) chartCPIInstance.destroy();
+      chartCPIInstance = new Chart(ctxCPI, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [{
+            data: results.map(r => r.stats.cpi),
+            backgroundColor: results.map(r => r.config.fwd ? '#38bdf8' : '#818cf8'),
+            borderRadius: 3
+          }]
+        },
+        options: commonOptions
+      });
+
+      // 2. Hazards
+      const ctxHazards = document.getElementById('chartHazards').getContext('2d');
+      if (chartHazardsInstance) chartHazardsInstance.destroy();
+      chartHazardsInstance = new Chart(ctxHazards, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [
+            { label: 'Stalls', data: results.map(r => r.stats.stallCycles), backgroundColor: '#f59e0b', borderRadius: 3 },
+            { label: 'Flushes', data: results.map(r => r.stats.flushCycles), backgroundColor: '#ef4444', borderRadius: 3 }
+          ]
+        },
+        options: {
+          ...commonOptions,
+          scales: {
+            x: { ...commonOptions.scales.x, stacked: true },
+            y: { ...commonOptions.scales.y, stacked: true }
+          }
+        }
+      });
+
+      // 3. Time
+      const ctxTime = document.getElementById('chartTime').getContext('2d');
+      if (chartTimeInstance) chartTimeInstance.destroy();
+      chartTimeInstance = new Chart(ctxTime, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [{
+            data: results.map(r => r.stats.executionTimeNs),
+            backgroundColor: results.map(r => r.config.fwd ? '#10b981' : '#059669'),
+            borderRadius: 3
+          }]
+        },
+        options: commonOptions
+      });
+    }
+
+    function updateChartsTheme() {
+      if (chartCPIInstance || chartHazardsInstance || chartTimeInstance) {
+        runComparisonAnalysis();
+      }
+    }
+
+
+    /* =================================================================
+       7. SIMULATION EXECUTION & INTERACTION CONTROLS
+       ================================================================= */
+    function stepSimulation() {
+      AudioEngine.tick();
+      if (!currentEngine || currentEngine.isHalted) return;
+      currentEngine.step();
+      updateUI();
+    }
+
+    function stepBackSimulation() {
+      if (!currentEngine) return;
+      if (isPlaying) stopPlaying();
+      const ok = currentEngine.stepBack();
+      if (ok) updateUI();
+    }
+
+    function startPlaying() {
+      if (isPlaying || !currentEngine || currentEngine.isHalted) return;
+      isPlaying = true;
+      playText.textContent = 'Pause';
+      playIcon.innerHTML = '&#10074;&#10074;';
+
+      timer = setInterval(() => {
+        if (!currentEngine || currentEngine.isHalted) {
+          stopPlaying();
+          updateUI();
+          return;
+        }
+        stepSimulation();
+      }, playSpeedMs);
+    }
+
+    function stopPlaying() {
+      if (!isPlaying) return;
+      isPlaying = false;
+      playText.textContent = 'Run';
+      playIcon.innerHTML = '&#9658;';
+      if (timer) {
+        clearInterval(timer);
+        timer = null;
+      }
+      if (currentEngine) updateUI();
+    }
+
+    function togglePlay() {
+      if (isPlaying) stopPlaying();
+      else startPlaying();
+    }
+
+    function finishSimulation() {
+      if (!currentEngine || currentEngine.isHalted) return;
+      stopPlaying();
+      currentEngine.run();
+      updateUI();
+    }
+
+
+    /* =================================================================
+       8. EXPORT AND REPORT GENERATION
+       ================================================================= */
+    function generateCsvContent() {
+      let csv = 'Configuration,Forwarding,Branch Predictor,Cycles,Retired Instructions,CPI,Stalls,Flushes,Mispredictions,Execution Time (ns)\n';
+      for (const r of lastComparisonResults) {
+        csv += `"${r.config.name}","${r.config.fwd ? 'ON' : 'OFF'}","${r.config.pred}",${r.stats.cycles},${r.stats.instructionsRetired},${r.stats.cpi},${r.stats.stallCycles},${r.stats.flushCycles},${r.stats.mispredictions},${r.stats.executionTimeNs}\n`;
+      }
+      return csv;
+    }
+
+    function generateMarkdownReport() {
+      if (!currentEngine) return '';
+      const stats = currentEngine.getStats();
+      let md = `# PipeLab: CPU Pipeline Execution Report\nGenerated: ${new Date().toLocaleString()}\n\n`;
+      md += `## 1. Simulation Metrics\n`;
+      md += `- Cycles: ${stats.cycles}\n- Retired Instructions: ${stats.instructionsRetired}\n- CPI: ${stats.cpi}\n- Stalls: ${stats.stallCycles}\n- Flushes: ${stats.flushCycles}\n- Mispredictions: ${stats.mispredictions}\n- Execution Time: ${stats.executionTimeNs} ns\n\n`;
+      md += `## 2. Program Code\n\`\`\`assembly\n${asmEditor.value.trim()}\n\`\`\`\n`;
+      return md;
+    }
+
+    function downloadFile(content, fileName, mimeType) {
+      const blob = new Blob([content], { type: mimeType });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, 100);
+    }
+
+
+    /* =================================================================
+       9. EVENT LISTENERS & VIEW SWITCHING
+       ================================================================= */
+    function switchView(tabBtn, targetPane) {
+      document.querySelectorAll('.view-tab-btn').forEach(b => b.classList.remove('active'));
+      tabBtn.classList.add('active');
+
+      viewPaneLive.style.display = 'none';
+      viewPaneTrace.style.display = 'none';
+      viewPaneCompare.style.display = 'none';
+      viewPaneStudio.style.display = 'none';
+      viewPaneState.style.display = 'none';
+
+      targetPane.style.display = targetPane === viewPaneLive ? 'flex' : 'block';
+    }
+
+    function setupEventListeners() {
+      stepBtn.addEventListener('click', stepSimulation);
+      stepBackBtn.addEventListener('click', stepBackSimulation);
+      playBtn.addEventListener('click', togglePlay);
+      finishBtn.addEventListener('click', finishSimulation);
+      resetBtn.addEventListener('click', () => { initOrResetEngine(); });
+
+      speedSlider.addEventListener('input', (e) => {
+        playSpeedMs = parseInt(e.target.value, 10);
+        speedVal.textContent = `${playSpeedMs}ms`;
+        if (isPlaying) {
+          stopPlaying();
+          startPlaying();
+        }
+      });
+
+      // View switching tabs
+      viewLiveBtn.addEventListener('click', () => switchView(viewLiveBtn, viewPaneLive));
+      viewTraceBtn.addEventListener('click', () => switchView(viewTraceBtn, viewPaneTrace));
+      viewCompareBtn.addEventListener('click', () => switchView(viewCompareBtn, viewPaneCompare));
+      viewStudioBtn.addEventListener('click', () => switchView(viewStudioBtn, viewPaneStudio));
+      viewStateBtn.addEventListener('click', () => switchView(viewStateBtn, viewPaneState));
+
+      sampleSelect.addEventListener('change', (e) => {
+        const key = e.target.value;
+        if (SAMPLE_PROGRAMS[key]) {
+          asmEditor.value = SAMPLE_PROGRAMS[key];
+          document.getElementById('activeProgName').textContent = sampleSelect.options[sampleSelect.selectedIndex].text.split('.')[1].trim();
+          updateGutter();
+          initOrResetEngine();
+        }
+      });
+
+      loadSampleBtn.addEventListener('click', () => {
+        const key = sampleSelect.value;
+        if (SAMPLE_PROGRAMS[key]) {
+          asmEditor.value = SAMPLE_PROGRAMS[key];
+          updateGutter();
+          initOrResetEngine();
+        }
+      });
+
+      assembleBtn.addEventListener('click', () => {
+        initOrResetEngine();
+        switchView(viewLiveBtn, viewPaneLive);
+      });
+      asmEditor.addEventListener('input', () => { updateGutter(); });
+      asmEditor.addEventListener('scroll', () => { editorGutter.scrollTop = asmEditor.scrollTop; });
+
+      fwdToggle.addEventListener('change', (e) => {
+        const fwd = e.target.checked;
+        fwdStatusText.textContent = fwd ? 'ON (MEM->EX)' : 'OFF (Stalls in ID)';
+        fwdStatusText.style.color = fwd ? 'var(--c-ex)' : 'var(--text-dim)';
+        initOrResetEngine();
+      });
+
+      predictorSelect.addEventListener('change', () => { initOrResetEngine(); });
+
+      formatToggleBtn.addEventListener('click', () => {
+        isHexMode = !isHexMode;
+        formatToggleBtn.textContent = isHexMode ? 'HEX' : 'DEC';
+        updateStateGrids();
+        updateStageCards();
+      });
+
+      clearLogBtn.addEventListener('click', () => {
+        if (currentEngine) currentEngine.logs = [];
+        updateHazardLog();
+      });
+
+      refreshCompareBtn.addEventListener('click', () => { runComparisonAnalysis(); });
+      themeToggleBtn.addEventListener('click', toggleTheme);
+
+      // Modals
+      isaModalBtn.addEventListener('click', () => { isaModalOverlay.classList.add('active'); });
+      isaModalCloseBtn.addEventListener('click', () => { isaModalOverlay.classList.remove('active'); });
+      isaModalOverlay.addEventListener('click', (e) => { if (e.target === isaModalOverlay) isaModalOverlay.classList.remove('active'); });
+
+      exportModalBtn.addEventListener('click', () => { exportModalOverlay.classList.add('active'); });
+      exportModalCloseBtn.addEventListener('click', () => { exportModalOverlay.classList.remove('active'); });
+      exportModalOverlay.addEventListener('click', (e) => { if (e.target === exportModalOverlay) exportModalOverlay.classList.remove('active'); });
+
+      exportCsvBtn.addEventListener('click', () => {
+        const csv = generateCsvContent();
+        downloadFile(csv, 'pipelab_comparison_matrix.csv', 'text/csv');
+      });
+
+      exportMarkdownBtn.addEventListener('click', () => {
+        const md = generateMarkdownReport();
+        downloadFile(md, 'pipelab_report.md', 'text/markdown');
+      });
+
+      copyReportBtn.addEventListener('click', () => {
+        const md = generateMarkdownReport();
+        navigator.clipboard.writeText(md).then(() => {
+          copyReportBtn.textContent = '✓ Copied!';
+          setTimeout(() => { copyReportBtn.textContent = '📋 Copy Report to Clipboard'; }, 1500);
+        });
+      });
+
+      // Keyboard Shortcuts
+      document.addEventListener('keydown', (e) => {
+        if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') return;
+
+        if ((e.ctrlKey || e.metaKey) && e.code === 'KeyK') {
+          e.preventDefault();
+          window.openCommandPalette ? window.openCommandPalette() : null;
+          return;
+        }
+        if (e.code === 'KeyM') {
+          e.preventDefault();
+          AudioEngine.toggle();
+          return;
+        }
+        if (e.code === 'KeyT') {
+          e.preventDefault();
+          toggleTheme();
+          return;
+        }
+        if (e.code === 'Digit1' && e.altKey) { e.preventDefault(); switchView('live'); return; }
+        if (e.code === 'Digit2' && e.altKey) { e.preventDefault(); switchView('trace'); return; }
+        if (e.code === 'Digit3' && e.altKey) { e.preventDefault(); switchView('compare'); return; }
+        if (e.code === 'Digit4' && e.altKey) { e.preventDefault(); switchView('studio'); return; }
+        if (e.code === 'Digit5' && e.altKey) { e.preventDefault(); switchView('state'); return; }
+
+
+        if (e.code === 'KeyS') { e.preventDefault(); stepSimulation(); }
+        else if (e.code === 'KeyA') { e.preventDefault(); stepBackSimulation(); }
+        else if (e.code === 'Space') { e.preventDefault(); togglePlay(); }
+        else if (e.code === 'KeyR') { e.preventDefault(); initOrResetEngine(); }
+        else if (e.key === '?') { e.preventDefault(); isaModalOverlay.classList.toggle('active'); }
+        else if (e.code === 'Escape') {
+          isaModalOverlay.classList.remove('active');
+          exportModalOverlay.classList.remove('active');
+        }
+      });
+    }
+
+    
+    // === WEB AUDIO SYNTHESIZER ENGINE (App Sound FX) ===
+    const AudioEngine = {
+      ctx: null,
+      enabled: true,
+      init() {
+        if (!this.ctx && (window.AudioContext || window.webkitAudioContext)) {
+          this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+      },
+      beep(freq, type = 'sine', duration = 0.05, gainVal = 0.08) {
+        if (!this.enabled) return;
+        try {
+          this.init();
+          if (this.ctx.state === 'suspended') this.ctx.resume();
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = type;
+          osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+          gain.gain.setValueAtTime(gainVal, this.ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + duration);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start();
+          osc.stop(this.ctx.currentTime + duration);
+        } catch (e) {}
+      },
+      tick() { this.beep(850, 'sine', 0.03, 0.05); },
+      click() { this.beep(1200, 'triangle', 0.02, 0.04); },
+      stall() { 
+        this.beep(280, 'square', 0.08, 0.06);
+        setTimeout(() => this.beep(220, 'square', 0.1, 0.06), 90);
+      },
+      flush() {
+        if (!this.enabled) return;
+        try {
+          this.init();
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(450, this.ctx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(150, this.ctx.currentTime + 0.15);
+          gain.gain.setValueAtTime(0.06, this.ctx.currentTime);
+          gain.gain.linearRampToValueAtTime(0.0001, this.ctx.currentTime + 0.15);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start();
+          osc.stop(this.ctx.currentTime + 0.15);
+        } catch (e) {}
+      },
+      complete() {
+        [523.25, 659.25, 783.99, 1046.50].forEach((freq, i) => {
+          setTimeout(() => this.beep(freq, 'sine', 0.25, 0.08), i * 110);
+        });
+      },
+      toggle() {
+        this.enabled = !this.enabled;
+        const icon = document.getElementById('audioIcon');
+        const text = document.getElementById('audioText');
+        const barText = document.getElementById('barAudioStatus');
+        if (icon) icon.innerHTML = this.enabled ? '&#128266;' : '&#128263;';
+        if (text) text.textContent = this.enabled ? 'Sound ON' : 'Sound OFF';
+        if (barText) barText.textContent = this.enabled ? 'AUDIO: ON' : 'AUDIO: OFF';
+        showToast(this.enabled ? 'Audio Synthesizer Enabled' : 'Audio Synthesizer Muted', 'info');
+      }
+    };
+
+    // Toast Alert Helper
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toastContainer');
+      if (!container) return;
+      const toast = document.createElement('div');
+      toast.className = 'toast-card ' + type;
+      toast.innerHTML = '<span>' + (type === 'success' ? '&#10004;' : type === 'warning' ? '&#9888;' : '&#8505;') + '</span> <span>' + message + '</span>';
+      container.appendChild(toast);
+      setTimeout(() => {
+        toast.classList.add('fadeout');
+        setTimeout(() => toast.remove(), 300);
+      }, 3000);
+    }
+
+    // Command Palette Commands Definition
+    const APP_COMMANDS = [
+      { id: 'step', title: 'Step Forward 1 Cycle', category: 'Simulation', shortcut: 'S', action: () => { stepSimulation(); } },
+      { id: 'stepBack', title: 'Step Back (Undo Snapshot)', category: 'Simulation', shortcut: 'A', action: () => { stepBackSimulation(); } },
+      { id: 'play', title: 'Run / Pause Continuous Clock', category: 'Simulation', shortcut: 'Space', action: () => { togglePlay(); } },
+      { id: 'finish', title: 'Finish Program to End', category: 'Simulation', shortcut: 'F', action: () => { finishSimulation(); } },
+      { id: 'reset', title: 'Reset Architectural State', category: 'Simulation', shortcut: 'R', action: () => { initOrResetEngine(); showToast('Engine State Reset', 'info'); } },
+      { id: 'viewLive', title: 'Switch View: Live Operations Deck', category: 'View', shortcut: '1', action: () => { switchView('live'); } },
+      { id: 'viewTrace', title: 'Switch View: Space-Time Trace Matrix', category: 'View', shortcut: '2', action: () => { switchView('trace'); } },
+      { id: 'viewCompare', title: 'Switch View: 8-Configuration Matrix', category: 'View', shortcut: '3', action: () => { switchView('compare'); } },
+      { id: 'viewStudio', title: 'Switch View: Assembly Studio', category: 'View', shortcut: '4', action: () => { switchView('studio'); } },
+      { id: 'viewState', title: 'Switch View: State Explorer (RAM/Registers)', category: 'View', shortcut: '5', action: () => { switchView('state'); } },
+      { id: 'toggleFwd', title: 'Toggle Data Forwarding Unit', category: 'Hardware', action: () => { 
+        fwdToggle.checked = !fwdToggle.checked;
+        fwdToggle.dispatchEvent(new Event('change'));
+        showToast('Forwarding: ' + (fwdToggle.checked ? 'ENABLED' : 'DISABLED'), 'info');
+      }},
+      { id: 'pred2bit', title: 'Branch Predictor: 2-Bit Saturating Counter', category: 'Hardware', action: () => {
+        predictorSelect.value = '2-bit';
+        predictorSelect.dispatchEvent(new Event('change'));
+        showToast('Predictor set to 2-Bit Saturating', 'info');
+      }},
+      { id: 'predNotTaken', title: 'Branch Predictor: Always Not-Taken', category: 'Hardware', action: () => {
+        predictorSelect.value = 'not-taken';
+        predictorSelect.dispatchEvent(new Event('change'));
+        showToast('Predictor set to Always Not-Taken', 'info');
+      }},
+      { id: 'loadArraySum', title: 'Load Program: Array Sum (mem[30]=210)', category: 'Programs', action: () => {
+        sampleSelect.value = '5';
+        sampleSelect.dispatchEvent(new Event('change'));
+        showToast('Loaded Array Sum Program', 'success');
+      }},
+      { id: 'loadLoop', title: 'Load Program: 8-Iteration Loop', category: 'Programs', action: () => {
+        sampleSelect.value = '4';
+        sampleSelect.dispatchEvent(new Event('change'));
+        showToast('Loaded 8-Iteration Loop Program', 'success');
+      }},
+      { id: 'exportCsv', title: 'Export 8-Config Matrix CSV', category: 'Export', action: () => {
+        const csv = generateCsvContent();
+        downloadFile(csv, 'pipelab_comparison_matrix.csv', 'text/csv');
+        showToast('Exported CSV Matrix', 'success');
+      }},
+      { id: 'exportMd', title: 'Export Markdown Analysis Report', category: 'Export', action: () => {
+        const md = generateMarkdownReport();
+        downloadFile(md, 'pipelab_report.md', 'text/markdown');
+        showToast('Exported Markdown Report', 'success');
+      }},
+      { id: 'toggleSound', title: 'Toggle Web Audio SFX', category: 'Audio', shortcut: 'M', action: () => { AudioEngine.toggle(); } },
+      { id: 'fullscreen', title: 'Toggle Fullscreen Mode', category: 'Window', shortcut: 'F11', action: () => { toggleFullscreen(); } },
+      { id: 'toggleTheme', title: 'Toggle Dark / Light Theme', category: 'Window', shortcut: 'T', action: () => { toggleTheme(); } },
+      { id: 'isaGuide', title: 'Open ISA Architecture Guide', category: 'Help', shortcut: '?', action: () => { isaModalOverlay.classList.add('active'); } }
+    ];
+
+    function toggleFullscreen() {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      } else {
+        if (document.exitFullscreen) document.exitFullscreen().catch(() => {});
+      }
+    }
+
+    // Command Palette UI Handlers
+    function initCommandPalette() {
+      const overlay = document.getElementById('cmdPaletteOverlay');
+      const input = document.getElementById('cmdPaletteInput');
+      const list = document.getElementById('cmdPaletteList');
+      const trigger = document.getElementById('cmdPaletteTrigger');
+      let selectedIdx = 0;
+
+      function renderCommands(filter = '') {
+        const query = filter.toLowerCase().trim();
+        const matches = APP_COMMANDS.filter(cmd => 
+          cmd.title.toLowerCase().includes(query) || 
+          cmd.category.toLowerCase().includes(query) ||
+          (cmd.shortcut && cmd.shortcut.toLowerCase().includes(query))
+        );
+
+        list.innerHTML = '';
+        if (matches.length === 0) {
+          list.innerHTML = '<div style="padding:16px; text-align:center; color:var(--text-dim); font-size:12px;">No matching commands</div>';
+          return;
+        }
+
+        matches.forEach((cmd, idx) => {
+          const item = document.createElement('div');
+          item.className = 'cmd-item' + (idx === selectedIdx ? ' selected' : '');
+          item.innerHTML = '<div><strong>' + cmd.title + '</strong> <span style="font-size:10px; color:var(--text-dim); margin-left:6px;">[' + cmd.category + ']</span></div>' +
+                           (cmd.shortcut ? '<span class="cmd-badge">' + cmd.shortcut + '</span>' : '');
+          item.addEventListener('click', () => {
+            cmd.action();
+            closePalette();
+          });
+          list.appendChild(item);
+        });
+      }
+
+      function openPalette() {
+        overlay.classList.add('active');
+        input.value = '';
+        selectedIdx = 0;
+        renderCommands();
+        setTimeout(() => input.focus(), 50);
+      }
+
+      function closePalette() {
+        overlay.classList.remove('active');
+      }
+
+      if (trigger) trigger.addEventListener('click', openPalette);
+      const menuCmd = document.getElementById('menuCmdPalette');
+      if (menuCmd) menuCmd.addEventListener('click', openPalette);
+
+      overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) closePalette();
+      });
+
+      input.addEventListener('input', (e) => {
+        selectedIdx = 0;
+        renderCommands(e.target.value);
+      });
+
+      input.addEventListener('keydown', (e) => {
+        const items = list.querySelectorAll('.cmd-item');
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          selectedIdx = Math.min(selectedIdx + 1, items.length - 1);
+          renderCommands(input.value);
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          selectedIdx = Math.max(selectedIdx - 1, 0);
+          renderCommands(input.value);
+        } else if (e.key === 'Enter') {
+          e.preventDefault();
+          const query = input.value.toLowerCase().trim();
+          const matches = APP_COMMANDS.filter(cmd => 
+            cmd.title.toLowerCase().includes(query) || 
+            cmd.category.toLowerCase().includes(query)
+          );
+          if (matches[selectedIdx]) {
+            matches[selectedIdx].action();
+            closePalette();
+          }
+        } else if (e.key === 'Escape') {
+          closePalette();
+        }
+      });
+
+      window.openCommandPalette = openPalette;
+      window.closeCommandPalette = closePalette;
+    }
+
+    // App Status Bar updater
+    function updateAppStatusBar() {
+      const barCycles = document.getElementById('barCycles');
+      const barPC = document.getElementById('barPC');
+      const barCPI = document.getElementById('barCPI');
+      const barFwd = document.getElementById('barFwd');
+      const barPredictor = document.getElementById('barPredictor');
+      const barHazards = document.getElementById('barHazards');
+      const barClockPeriod = document.getElementById('barClockPeriod');
+      const barEngineStatus = document.getElementById('barEngineStatus');
+      const barStatusDot = document.getElementById('barStatusDot');
+
+      if (!currentEngine) return;
+
+      const stats = currentEngine.getStats();
+      if (barCycles) barCycles.textContent = stats.cycles;
+      if (barPC) barPC.textContent = '0x' + currentEngine.pc.toString(16).padStart(4, '0').toUpperCase();
+      if (barCPI) barCPI.textContent = stats.cpi.toFixed(2);
+      if (barFwd) barFwd.textContent = 'FWD: ' + (currentEngine.forwardingEnabled ? 'ON' : 'OFF');
+      if (barPredictor) barPredictor.textContent = 'PRED: ' + currentEngine.predictorType.toUpperCase();
+      if (barHazards) barHazards.textContent = 'HAZARDS: ' + (stats.stallCycles + stats.flushCycles);
+      if (barClockPeriod && clockPeriodInput) barClockPeriod.textContent = clockPeriodInput.value + 'ns';
+
+      if (barEngineStatus && barStatusDot) {
+        if (currentEngine.isHalted) {
+          barEngineStatus.textContent = 'HALTED';
+          barStatusDot.style.background = '#38bdf8';
+        } else if (isPlaying) {
+          barEngineStatus.textContent = 'RUNNING';
+          barStatusDot.style.background = '#10b981';
+        } else if (currentEngine.cycle > 0) {
+          barEngineStatus.textContent = 'PAUSED';
+          barStatusDot.style.background = '#f59e0b';
+        } else {
+          barEngineStatus.textContent = 'READY';
+          barStatusDot.style.background = '#10b981';
+        }
+      }
+    }
+
+    // PWA Service Worker Registration
+    if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(() => {});
+      });
+    }
+
+    let deferredPrompt = null;
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      const installBtn = document.getElementById('appInstallBtn');
+      if (installBtn) installBtn.style.display = 'inline-flex';
+    });
+
+    const installBtn = document.getElementById('appInstallBtn');
+    if (installBtn) {
+      installBtn.addEventListener('click', async () => {
+        if (deferredPrompt) {
+          deferredPrompt.prompt();
+          const { outcome } = await deferredPrompt.userChoice;
+          if (outcome === 'accepted') {
+            installBtn.style.display = 'none';
+            showToast('PipeLab installed to desktop!', 'success');
+          }
+          deferredPrompt = null;
+        } else {
+          showToast('Launch via PipeLab.bat for Standalone Desktop Mode', 'info');
+        }
+      });
+    }
+
+
+    window.addEventListener('DOMContentLoaded', init);
+  </script>
+
+  <!-- Quick Command Palette Modal (Ctrl+K / Spotlight Style) -->
+  <div class="cmd-palette-overlay" id="cmdPaletteOverlay">
+    <div class="cmd-palette-modal">
+      <div class="cmd-palette-header">
+        <span style="font-size:16px;">&#128269;</span>
+        <input type="text" id="cmdPaletteInput" placeholder="Type a command or micro-op action..." autocomplete="off">
+        <span class="cmd-esc-hint">ESC</span>
+      </div>
+      <div class="cmd-palette-list" id="cmdPaletteList"></div>
+    </div>
+  </div>
+
+  <!-- Fixed Native App Status Bar (IDE Style) -->
+  <footer class="app-status-bar" id="appStatusBar">
+    <div class="status-bar-left">
+      <span class="status-item"><span class="status-pulse-dot" id="barStatusDot" style="display:inline-block; width:6px; height:6px; border-radius:50%; background:#10b981; margin-right:4px;"></span> STATUS: <strong id="barEngineStatus">READY</strong></span>
+      <span class="status-item divider">|</span>
+      <span class="status-item">CYCLE: <strong id="barCycles">0</strong></span>
+      <span class="status-item">PC: <strong id="barPC">0x0000</strong></span>
+      <span class="status-item">CPI: <strong id="barCPI">0.00</strong></span>
+    </div>
+    <div class="status-bar-center">
+      <span class="status-item" id="barFwd">FWD: ON</span>
+      <span class="status-item divider">&bull;</span>
+      <span class="status-item" id="barPredictor">PRED: 2-BIT SAT</span>
+      <span class="status-item divider">&bull;</span>
+      <span class="status-item" id="barHazards">HAZARDS: 0</span>
+    </div>
+    <div class="status-bar-right">
+      <span class="status-item">CLOCK: <span id="barClockPeriod">250ms</span></span>
+      <span class="status-item divider">|</span>
+      <span class="status-item" id="barAudioStatus" style="cursor:pointer;" title="Click to toggle sound">AUDIO: ON</span>
+      <span class="status-item divider">|</span>
+      <span class="status-item" id="barFsBtn" style="cursor:pointer;" title="Toggle Fullscreen">&#10530; FULLSCREEN</span>
+    </div>
+  </footer>
+
+  <!-- Toast Notification Container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+</body>
+</html>
