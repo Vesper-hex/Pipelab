@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PipeLab - Project Demonstration Video & Interactive Presentation</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #090d16;
+  --card: #0f172a;
+  --card-border: #1e293b;
+  --accent: #38bdf8;
+  --accent-glow: rgba(56, 189, 248, 0.25);
+  --green: #10b981;
+  --amber: #f59e0b;
+  --red: #ef4444;
+  --purple: #a855f7;
+  --pink: #ec4899;
+  --text: #f8fafc;
+  --text-muted: #94a3b8;
+  --c-if: #38bdf8;
+  --c-id: #a855f7;
+  --c-ex: #10b981;
+  --c-mem: #f59e0b;
+  --c-wb: #ec4899;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', sans-serif;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+header {
+  height: 56px;
+  background: #0b1120;
+  border-bottom: 1px solid var(--card-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.badge-rec {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #ef4444;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-family: 'JetBrains Mono', monospace;
+}
+.rec-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ef4444;
+  animation: pulse 1s infinite alternate;
+}
+@keyframes pulse { from { opacity: 0.3; } to { opacity: 1; } }
+
+.main-stage {
+  flex: 1;
+  display: flex;
+  padding: 20px;
+  gap: 20px;
+  overflow: hidden;
+}
+.video-frame {
+  flex: 3;
+  background: #020617;
+  border: 1px solid #1e293b;
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+}
+.video-screen {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  position: relative;
+  text-align: center;
+}
+.video-overlay {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  display: flex;
+  gap: 10px;
+}
+.chapter-pill {
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  font-size: 11px;
+  font-family: 'JetBrains Mono', monospace;
+  padding: 4px 12px;
+  border-radius: 20px;
+  backdrop-filter: blur(8px);
+}
+.slide-content {
+  max-width: 860px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  animation: fadeIn 0.4s ease-out;
+}
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+.slide-title {
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  background: linear-gradient(135deg, #f8fafc, #94a3b8);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.slide-subtitle {
+  font-size: 16px;
+  color: #38bdf8;
+  font-weight: 500;
+  max-width: 650px;
+  line-height: 1.5;
+}
+.slide-visual {
+  width: 100%;
+  margin-top: 10px;
+}
+
+/* Stage Flow Graphic */
+.stage-boxes {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  width: 100%;
+}
+.sb-card {
+  flex: 1;
+  background: #0f172a;
+  border: 2px solid;
+  border-radius: 12px;
+  padding: 16px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transition: all 0.3s;
+}
+.sb-card.active {
+  transform: translateY(-4px) scale(1.05);
+  box-shadow: 0 10px 25px rgba(56, 189, 248, 0.25);
+}
+.sb-card.if { border-color: var(--c-if); }
+.sb-card.id { border-color: var(--c-id); }
+.sb-card.ex { border-color: var(--c-ex); }
+.sb-card.mem { border-color: var(--c-mem); }
+.sb-card.wb { border-color: var(--c-wb); }
+.sb-tag { font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); }
+.sb-name { font-size: 18px; font-weight: 800; }
+.sb-desc { font-size: 11px; color: var(--text-muted); line-height: 1.3; }
+
+/* Metrics Preview */
+.metrics-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  width: 100%;
+}
+.metric-box {
+  background: #0f172a;
+  border: 1px solid #1e293b;
+  border-radius: 12px;
+  padding: 14px;
+  text-align: left;
+}
+.mb-label { font-size: 11px; color: var(--text-muted); }
+.mb-val { font-size: 26px; font-weight: 800; font-family: 'JetBrains Mono', monospace; margin-top: 4px; }
+
+/* Subtitle Teleprompter */
+.teleprompter {
+  background: rgba(15, 23, 42, 0.95);
+  border-top: 1px solid #1e293b;
+  padding: 16px 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.speech-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(56, 189, 248, 0.15);
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 16px;
+}
+.teleprompter-text {
+  font-size: 14px;
+  color: #e2e8f0;
+  line-height: 1.5;
+  font-style: italic;
+  flex: 1;
+  text-align: left;
+}
+
+/* Video Player Controls */
+.video-controls {
+  height: 60px;
+  background: #0b1120;
+  border-top: 1px solid #1e293b;
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  gap: 16px;
+}
+.btn-play {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: none;
+  color: #020617;
+  font-size: 18px;
+  font-weight: 800;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+.btn-play:hover { transform: scale(1.08); background: #7dd3fc; }
+.time-display {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.progress-bar-wrap {
+  flex: 1;
+  height: 6px;
+  background: #1e293b;
+  border-radius: 3px;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--accent), var(--green));
+  border-radius: 3px;
+  transition: width 0.3s linear;
+}
+.btn-voice {
+  background: rgba(56, 189, 248, 0.1);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  color: var(--accent);
+  font-size: 12px;
+  padding: 6px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+/* Sidebar Chapters */
+.chapters-sidebar {
+  flex: 1;
+  background: #0b1120;
+  border: 1px solid var(--card-border);
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.cs-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--card-border);
+  font-weight: 700;
+  font-size: 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.chapter-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.chapter-item {
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: #0f172a;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+}
+.chapter-item:hover { background: #162035; border-color: #334155; }
+.chapter-item.active {
+  background: rgba(56, 189, 248, 0.12);
+  border-color: rgba(56, 189, 248, 0.4);
+}
+.ci-num { font-size: 10px; font-family: 'JetBrains Mono', monospace; color: var(--accent); font-weight: 700; }
+.ci-title { font-size: 13px; font-weight: 600; color: #f1f5f9; }
+.ci-dur { font-size: 10px; color: var(--text-muted); }
+
+.cs-footer {
+  padding: 16px;
+  border-top: 1px solid var(--card-border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.btn-open-app {
+  width: 100%;
+  padding: 10px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, var(--green), #059669);
+  color: #fff;
+  border: none;
+  font-weight: 700;
+  font-size: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  text-decoration: none;
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div style="font-weight: 800; font-size: 16px; color: #f8fafc; letter-spacing: -0.5px;">PipeLab</div>
+    <div style="font-size: 12px; color: var(--text-muted);">| Project Demonstration Video</div>
+  </div>
+  <div class="badge-rec">
+    <div class="rec-dot"></div>
+    <span>DEMO MODE ACTIVE</span>
+  </div>
+</header>
+
+<div class="main-stage">
+  <!-- Video Player Box -->
+  <div class="video-frame">
+    <div class="video-overlay">
+      <div class="chapter-pill" id="currentChapterPill">CHAPTER 1 / 5</div>
+    </div>
+
+    <!-- Video Canvas Screen -->
+    <div class="video-screen" id="videoScreen">
+      <div class="slide-content" id="slideContent">
+        <!-- Rendered by JS -->
+      </div>
+    </div>
+
+    <!-- Teleprompter / Narration Text -->
+    <div class="teleprompter">
+      <div class="speech-icon">🎙️</div>
+      <div class="teleprompter-text" id="narrationText">
+        "Welcome mam. This is the complete project demonstration of PipeLab: a cycle-accurate 5-stage RISC CPU Pipeline and Performance Simulator."
+      </div>
+    </div>
+
+    <!-- Video Player Progress & Controls -->
+    <div class="video-controls">
+      <button class="btn-play" id="btnPlay" onclick="togglePlay()">▶</button>
+      <div class="time-display" id="timeDisplay">0:00 / 2:30</div>
+      <div class="progress-bar-wrap" onclick="seek(event)">
+        <div class="progress-fill" id="progressFill"></div>
+      </div>
+      <button class="btn-voice" id="btnVoice" onclick="toggleVoice()">🔊 Voice: ON</button>
+    </div>
+  </div>
+
+  <!-- Chapters Sidebar -->
+  <div class="chapters-sidebar">
+    <div class="cs-header">
+      <span>Demo Chapters</span>
+      <span style="font-size: 11px; color: var(--accent); font-family: 'JetBrains Mono', monospace;">5 SCENES</span>
+    </div>
+
+    <div class="chapter-list">
+      <div class="chapter-item active" onclick="jumpTo(0)">
+        <div class="ci-num">CHAPTER 01</div>
+        <div class="ci-title">Project Overview &amp; 5-Stage RISC Architecture</div>
+        <div class="ci-dur">0:00 - 0:30 • Hardware stages &amp; ISA</div>
+      </div>
+      <div class="chapter-item" onclick="jumpTo(1)">
+        <div class="ci-num">CHAPTER 02</div>
+        <div class="ci-title">Data Hazards &amp; Forwarding Logic</div>
+        <div class="ci-dur">0:30 - 1:05 • RAW dependencies &amp; bypass buses</div>
+      </div>
+      <div class="chapter-item" onclick="jumpTo(2)">
+        <div class="ci-num">CHAPTER 03</div>
+        <div class="ci-title">Load-Use Latency &amp; Memory Bubbles</div>
+        <div class="ci-dur">1:05 - 1:35 • Physical constraints of load instructions</div>
+      </div>
+      <div class="chapter-item" onclick="jumpTo(3)">
+        <div class="ci-num">CHAPTER 04</div>
+        <div class="ci-title">Branch Prediction &amp; 2-Cycle Flush Penalty</div>
+        <div class="ci-dur">1:35 - 2:05 • 2-bit Saturating Counter comparison</div>
+      </div>
+      <div class="chapter-item" onclick="jumpTo(4)">
+        <div class="ci-num">CHAPTER 05</div>
+        <div class="ci-title">Optimization Matrix &amp; CPI Benchmark Suite</div>
+        <div class="ci-dur">2:05 - 2:30 • 8-configuration side-by-side analysis</div>
+      </div>
+    </div>
+
+    <div class="cs-footer">
+      <a href="index.html" target="_blank" class="btn-open-app">
+        <span>⚡ Open PipeLab Simulator Directly</span>
+      </a>
+    </div>
+  </div>
+</div>
+
+<script>
+const SCENES = [
+  {
+    title: "PipeLab: CPU Pipeline Simulator",
+    subtitle: "A cycle-accurate 5-stage RISC processor simulator developed for Computer Architecture research and demonstration.",
+    narration: "Good morning mam. This is PipeLab: an interactive, cycle-accurate 5-stage RISC CPU pipeline simulator. It demonstrates the fundamental principles of instruction pipelining, hardware hazard resolution, and branch prediction.",
+    visual: `
+      <div class="stage-boxes">
+        <div class="sb-card if active">
+          <div class="sb-tag">Stage 1</div>
+          <div class="sb-name" style="color:var(--c-if)">IF</div>
+          <div class="sb-desc">Instruction Fetch from memory using Program Counter.</div>
+        </div>
+        <div class="sb-card id active">
+          <div class="sb-tag">Stage 2</div>
+          <div class="sb-name" style="color:var(--c-id)">ID</div>
+          <div class="sb-desc">Decode opcode and fetch register operands Rs and Rt.</div>
+        </div>
+        <div class="sb-card ex active">
+          <div class="sb-tag">Stage 3</div>
+          <div class="sb-name" style="color:var(--c-ex)">EX</div>
+          <div class="sb-desc">Arithmetic &amp; Logic Unit compute, branch target calculation.</div>
+        </div>
+        <div class="sb-card mem active">
+          <div class="sb-tag">Stage 4</div>
+          <div class="sb-name" style="color:var(--c-mem)">MEM</div>
+          <div class="sb-desc">Access 256-byte data memory for Load Word and Store Word.</div>
+        </div>
+        <div class="sb-card wb active">
+          <div class="sb-tag">Stage 5</div>
+          <div class="sb-name" style="color:var(--c-wb)">WB</div>
+          <div class="sb-desc">Commit ALU or memory result into Destination Register.</div>
+        </div>
+      </div>
+    `
+  },
+  {
+    title: "Data Hazards & Forwarding Bypasses",
+    subtitle: "Overcoming Read-After-Write (RAW) register dependencies with EX-to-EX and MEM-to-EX bypass channels.",
+    narration: "When instructions have data dependencies, such as an ADD instruction whose result is immediately needed by a SUB instruction, a naive pipeline must stall for two full cycles. PipeLab includes hardware forwarding paths that route results straight from EX and MEM back into ALU inputs, achieving zero stalls.",
+    visual: `
+      <div class="metrics-row">
+        <div class="metric-box">
+          <div class="mb-label">Without Forwarding</div>
+          <div class="mb-val" style="color:var(--red)">17 Cycles</div>
+          <div style="font-size:11px; color:#f87171; margin-top:4px;">8 Stall Bubbles (CPI: 3.40)</div>
+        </div>
+        <div class="metric-box">
+          <div class="mb-label">With EX/MEM Forwarding</div>
+          <div class="mb-val" style="color:var(--green)">9 Cycles</div>
+          <div style="font-size:11px; color:#34d399; margin-top:4px;">0 Stalls (CPI: 1.80)</div>
+        </div>
+        <div class="metric-box">
+          <div class="mb-label">Performance Speedup</div>
+          <div class="mb-val" style="color:var(--accent)">1.89×</div>
+          <div style="font-size:11px; color:#38bdf8; margin-top:4px;">Ideal ALU Throughput</div>
+        </div>
+        <div class="metric-box">
+          <div class="mb-label">Hazard Status</div>
+          <div class="mb-val" style="color:var(--purple)">RESOLVED</div>
+          <div style="font-size:11px; color:#c084fc; margin-top:4px;">Internal Bypass Active</div>
+        </div>
+      </div>
+    `
+  },
+  {
+    title: "Load-Use Latency & Pipeline Bubbles",
+    subtitle: "Why memory loads inherently require a 1-cycle bubble even with forwarding enabled.",
+    narration: "Even with full forwarding, when an instruction immediately uses the result of a Load Word instruction, data is not ready until the end of the MEM stage. The hardware detects this hazard and automatically freezes the IF and ID stages for one cycle, inserting a bubble into the EX stage.",
+    visual: `
+      <div style="background:#0f172a; border:1px solid #1e293b; border-radius:12px; padding:18px; text-align:left; font-family:'JetBrains Mono',monospace; font-size:12px;">
+        <div style="color:#94a3b8; margin-bottom:8px;">// Load-Use Example:</div>
+        <div style="color:#f8fafc; margin-bottom:4px;">1. <span style="color:#38bdf8">LW</span>  R1, 0(R2)   <span style="color:#64748b;">; Data ready only after MEM stage (Cycle 4)</span></div>
+        <div style="color:#f8fafc; margin-bottom:4px;">2. <span style="color:#38bdf8">ADD</span> R3, R1, R4   <span style="color:#f59e0b;">; Needs R1 in EX stage (Cycle 3) → 1 STALL BUBBLE INSERTED</span></div>
+        <div style="color:#10b981; margin-top:12px; font-weight:700;">✓ PipeLab automatically detects this and holds PC and IF/ID latches.</div>
+      </div>
+    `
+  },
+  {
+    title: "Dynamic Branch Prediction & Flushing",
+    subtitle: "Comparing Always Not-Taken vs. 2-Bit Saturating Counter with a 2-Cycle Misprediction Penalty.",
+    narration: "Branches are resolved in the EX stage, meaning two instructions are already fetched into IF and ID. On a misprediction, PipeLab flushes these two slots with a penalty of two cycles. Our 2-bit saturating counter learns branch history, reducing loop penalties from seven mispredictions down to just two.",
+    visual: `
+      <div class="metrics-row">
+        <div class="metric-box">
+          <div class="mb-label">Always Not-Taken</div>
+          <div class="mb-val" style="color:var(--red)">7 Flushes</div>
+          <div style="font-size:11px; color:#f87171; margin-top:4px;">46 Total Cycles</div>
+        </div>
+        <div class="metric-box">
+          <div class="mb-label">2-Bit Saturating Predictor</div>
+          <div class="mb-val" style="color:var(--green)">2 Flushes</div>
+          <div style="font-size:11px; color:#34d399; margin-top:4px;">36 Total Cycles (10 Cycles Saved)</div>
+        </div>
+        <div class="metric-box">
+          <div class="mb-label">Flush Penalty</div>
+          <div class="mb-val" style="color:var(--amber)">2 Cycles</div>
+          <div style="font-size:11px; color:#fbbf24; margin-top:4px;">IF &amp; ID Slots Cleared</div>
+        </div>
+        <div class="metric-box">
+          <div class="mb-label">State Machine</div>
+          <div class="mb-val" style="color:var(--purple)">4-State</div>
+          <div style="font-size:11px; color:#c084fc; margin-top:4px;">Strong/Weak Taken/Not-Taken</div>
+        </div>
+      </div>
+    `
+  },
+  {
+    title: "Architectural Comparison Matrix",
+    subtitle: "Benchmarking all 8 architectural combinations across forwarding and predictor configurations.",
+    narration: "Finally, PipeLab automatically benchmarks any loaded program across all eight configurations simultaneously, displaying live CPI bar charts, hazard breakdown graphs, and highlighting the optimal configuration with a trophy badge. This allows students to conduct thorough architectural trade-off evaluations.",
+    visual: `
+      <div style="background:#0f172a; border:1px solid #1e293b; border-radius:12px; padding:20px; width:100%; text-align:left;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+          <span style="font-weight:700; font-size:14px;">Optimal Configuration Identified:</span>
+          <span style="background:rgba(16,185,129,0.15); border:1px solid #10b981; color:#10b981; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:700;">🏆 FASTEST: 2-Bit + Forwarding</span>
+        </div>
+        <div style="font-size:12px; color:var(--text-muted); line-height:1.6;">
+          • Fully verified across all 8 Section 8 reference benchmark tests.<br>
+          • 46/46 automated specification test cases verified.<br>
+          • Live interactive export available in CSV and academic Markdown reports.
+        </div>
+      </div>
+    `
+  }
+];
+
+let curIdx = 0;
+let playing = false;
+let timer = null;
+let voiceEnabled = true;
+const DURATION_PER_SCENE = 30; // seconds
+
+function renderScene(idx) {
+  curIdx = idx;
+  const s = SCENES[idx];
+  document.getElementById('currentChapterPill').textContent = `CHAPTER ${idx + 1} / ${SCENES.length}`;
+  document.getElementById('slideContent').innerHTML = `
+    <div class="slide-title">${s.title}</div>
+    <div class="slide-subtitle">${s.subtitle}</div>
+    <div class="slide-visual">${s.visual}</div>
+  `;
+  document.getElementById('narrationText').textContent = `"${s.narration}"`;
+  
+  // Highlight chapter item in sidebar
+  document.querySelectorAll('.chapter-item').forEach((el, i) => {
+    el.classList.toggle('active', i === idx);
+  });
+
+  // Voice narration using Web Speech API
+  if (voiceEnabled && window.speechSynthesis) {
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(s.narration);
+    u.rate = 1.0;
+    u.pitch = 1.0;
+    window.speechSynthesis.speak(u);
+  }
+}
+
+function updateProgress() {
+  const totalSecs = SCENES.length * DURATION_PER_SCENE;
+  const currentSecs = (curIdx * DURATION_PER_SCENE);
+  const frac = (curIdx + 1) / SCENES.length;
+  document.getElementById('progressFill').style.width = (frac * 100) + '%';
+  
+  const m = Math.floor(currentSecs / 60);
+  const s = currentSecs % 60;
+  document.getElementById('timeDisplay').textContent = `${m}:${s < 10 ? '0' : ''}${s} / 2:30`;
+}
+
+function togglePlay() {
+  playing = !playing;
+  document.getElementById('btnPlay').textContent = playing ? '⏸' : '▶';
+  if (playing) {
+    playNext();
+  } else {
+    clearTimeout(timer);
+    if (window.speechSynthesis) window.speechSynthesis.cancel();
+  }
+}
+
+function playNext() {
+  if (!playing) return;
+  renderScene(curIdx);
+  updateProgress();
+  timer = setTimeout(() => {
+    if (curIdx < SCENES.length - 1) {
+      curIdx++;
+      playNext();
+    } else {
+      playing = false;
+      document.getElementById('btnPlay').textContent = '▶';
+    }
+  }, DURATION_PER_SCENE * 1000);
+}
+
+function jumpTo(idx) {
+  curIdx = idx;
+  clearTimeout(timer);
+  renderScene(idx);
+  updateProgress();
+  if (playing) {
+    playNext();
+  }
+}
+
+function seek(e) {
+  const rect = e.currentTarget.getBoundingClientRect();
+  const frac = (e.clientX - rect.left) / rect.width;
+  const targetIdx = Math.min(SCENES.length - 1, Math.floor(frac * SCENES.length));
+  jumpTo(targetIdx);
+}
+
+function toggleVoice() {
+  voiceEnabled = !voiceEnabled;
+  document.getElementById('btnVoice').textContent = voiceEnabled ? '🔊 Voice: ON' : '🔇 Voice: OFF';
+  if (!voiceEnabled && window.speechSynthesis) {
+    window.speechSynthesis.cancel();
+  }
+}
+
+// Initial scene
+renderScene(0);
+updateProgress();
+</script>
+</body>
+</html>
