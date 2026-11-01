@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PipeLab - 45s Presentation Walkthrough Video</title>
+<title>PipeLab - 45s GitHub Demo Video Recorder</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
@@ -39,7 +39,7 @@ body {
   user-select: none;
 }
 header {
-  height: 52px;
+  height: 56px;
   background: rgba(13, 21, 39, 0.95);
   border-bottom: 1px solid var(--card-border);
   display: flex;
@@ -54,7 +54,7 @@ header {
 }
 .brand-title {
   font-weight: 800;
-  font-size: 15px;
+  font-size: 16px;
   color: #f8fafc;
   letter-spacing: -0.3px;
 }
@@ -85,7 +85,7 @@ header {
 }
 @keyframes pulse { from { opacity: 0.3; } to { opacity: 1; } }
 
-/* Main Video Stage */
+/* Stage */
 .stage {
   flex: 1;
   padding: 16px 24px;
@@ -108,7 +108,7 @@ header {
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7);
 }
 
-/* Floating Simulated Cursor */
+/* Simulated Cursor */
 .virtual-cursor {
   position: absolute;
   width: 22px;
@@ -140,7 +140,7 @@ header {
   border-color: #38bdf8;
 }
 
-/* Top Video Overlay */
+/* Top Overlay */
 .video-top-bar {
   padding: 16px 20px;
   display: flex;
@@ -174,7 +174,7 @@ header {
   border: 1px solid #1e293b;
 }
 
-/* Video Body Content */
+/* Video Canvas */
 .video-body {
   flex: 1;
   display: flex;
@@ -184,7 +184,6 @@ header {
   justify-content: center;
 }
 
-/* Scene Headers */
 .scene-header {
   margin-bottom: 20px;
   text-align: left;
@@ -214,7 +213,6 @@ header {
   line-height: 1.4;
 }
 
-/* Simulated App Mockup inside Video */
 .sim-app-window {
   background: #0b1329;
   border: 1px solid #1e293b;
@@ -226,7 +224,6 @@ header {
   box-shadow: 0 10px 30px rgba(0,0,0,0.5);
 }
 
-/* App Toolbar Simulation */
 .sim-toolbar {
   display: flex;
   align-items: center;
@@ -261,7 +258,6 @@ header {
   font-size: 11px;
   font-weight: 700;
   border: none;
-  cursor: pointer;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -296,9 +292,7 @@ header {
   position: relative;
   transition: all 0.3s;
 }
-.toggle-switch.on {
-  background: var(--green);
-}
+.toggle-switch.on { background: var(--green); }
 .toggle-circle {
   width: 14px;
   height: 14px;
@@ -309,11 +303,8 @@ header {
   left: 3px;
   transition: all 0.3s;
 }
-.toggle-switch.on .toggle-circle {
-  left: 19px;
-}
+.toggle-switch.on .toggle-circle { left: 19px; }
 
-/* Stage Cards Simulation */
 .sim-stages {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
@@ -343,7 +334,6 @@ header {
 .sc-name { font-size: 14px; font-weight: 800; }
 .sc-instr { font-size: 10px; font-family: 'JetBrains Mono', monospace; color: #cbd5e1; }
 
-/* Timing Diagram Grid */
 .sim-grid-wrap {
   background: #060a17;
   border: 1px solid #1e293b;
@@ -378,7 +368,6 @@ header {
   font-weight: 700;
 }
 
-/* Comparison Table Mock */
 .sim-compare-table {
   width: 100%;
   border-collapse: collapse;
@@ -414,7 +403,6 @@ header {
   font-size: 10px;
 }
 
-/* Narration Callout Bar */
 .action-callout {
   margin-top: 14px;
   background: rgba(56, 189, 248, 0.08);
@@ -425,21 +413,13 @@ header {
   align-items: center;
   gap: 12px;
 }
-.ac-icon {
-  font-size: 18px;
-}
-.ac-text {
-  font-size: 13px;
-  color: #e2e8f0;
-  font-weight: 600;
-}
-.ac-text span {
-  color: var(--accent);
-}
+.ac-icon { font-size: 18px; }
+.ac-text { font-size: 13px; color: #e2e8f0; font-weight: 600; }
+.ac-text span { color: var(--accent); }
 
-/* Video Bottom Player Bar */
+/* Bottom Bar */
 .player-controls {
-  height: 58px;
+  height: 64px;
   background: #090e1d;
   border-top: 1px solid var(--card-border);
   display: flex;
@@ -449,8 +429,8 @@ header {
   border-radius: 0 0 16px 16px;
 }
 .btn-play {
-  width: 40px;
-  height: 40px;
+  width: 42px;
+  height: 42px;
   border-radius: 50%;
   background: var(--accent);
   color: #020617;
@@ -487,6 +467,21 @@ header {
   border-radius: 3px;
   transition: width 0.1s linear;
 }
+.btn-record {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  color: #fff;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 0 15px rgba(239, 68, 68, 0.4);
+}
+.btn-record:hover { transform: translateY(-1px); }
 .btn-audio-mute {
   background: rgba(15, 23, 42, 0.8);
   border: 1px solid #334155;
@@ -504,11 +499,13 @@ header {
 <header>
   <div class="brand">
     <div class="brand-title">PipeLab</div>
-    <div class="brand-sub">| 45-Second Teacher Presentation Walkthrough</div>
+    <div class="brand-sub">| 45s GitHub Demonstration Video</div>
   </div>
-  <div class="badge-rec">
-    <div class="rec-dot"></div>
-    <span>AUTO DEMO: 45 SECONDS</span>
+  <div style="display:flex; gap:12px; align-items:center;">
+    <div class="badge-rec">
+      <div class="rec-dot"></div>
+      <span id="recStatusText">READY FOR GITHUB</span>
+    </div>
   </div>
 </header>
 
@@ -526,7 +523,7 @@ header {
     <div class="video-top-bar">
       <div class="step-pill" id="stepPill">STEP 1 OF 3: SHOW A PROGRAM RUNNING</div>
       <div class="music-badge">
-        <span>🎵 Lo-Fi Tech Synth (Web Audio)</span>
+        <span>🎵 Synth Background (Web Audio)</span>
       </div>
     </div>
 
@@ -543,6 +540,9 @@ header {
         <div class="progress-fill" id="progressFill"></div>
       </div>
       <button class="btn-audio-mute" id="btnMute" onclick="toggleMute()">🔊 Music: ON</button>
+      <button class="btn-record" id="btnRecord" onclick="recordVideoForGithub()">
+        <span>🔴</span> Record for GitHub (Win + Alt + R)
+      </button>
     </div>
   </div>
 </div>
@@ -554,7 +554,7 @@ header {
 let audioCtx = null;
 let isMuted = false;
 let musicTimer = null;
-const NOTES = [220, 261.63, 293.66, 329.63, 392, 440, 523.25]; // Am Pentatonic
+const NOTES = [220, 261.63, 293.66, 329.63, 392, 440, 523.25];
 
 function initAudio() {
   if (!audioCtx) {
@@ -567,27 +567,29 @@ function initAudio() {
 
 function playNote(freq, dur = 0.25, time = 0) {
   if (isMuted || !audioCtx) return;
-  const now = audioCtx.currentTime + time;
-  const osc = audioCtx.createOscillator();
-  const gain = audioCtx.createGain();
-  const filter = audioCtx.createBiquadFilter();
+  try {
+    const now = audioCtx.currentTime + time;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    const filter = audioCtx.createBiquadFilter();
 
-  osc.type = 'sine';
-  osc.frequency.setValueAtTime(freq, now);
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freq, now);
 
-  filter.type = 'lowpass';
-  filter.frequency.setValueAtTime(800, now);
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(800, now);
 
-  gain.gain.setValueAtTime(0.001, now);
-  gain.gain.exponentialRampToValueAtTime(0.06, now + 0.04);
-  gain.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+    gain.gain.setValueAtTime(0.001, now);
+    gain.gain.exponentialRampToValueAtTime(0.06, now + 0.04);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + dur);
 
-  osc.connect(filter);
-  filter.connect(gain);
-  gain.connect(audioCtx.destination);
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(audioCtx.destination);
 
-  osc.start(now);
-  osc.stop(now + dur);
+    osc.start(now);
+    osc.stop(now + dur);
+  } catch(e) {}
 }
 
 function startMusicLoop() {
@@ -598,7 +600,7 @@ function startMusicLoop() {
     const note = NOTES[step % NOTES.length];
     playNote(note, 0.4, 0);
     if (step % 2 === 0) {
-      playNote(110, 0.6, 0); // bass note
+      playNote(110, 0.6, 0);
     }
     step++;
   }, 350);
@@ -612,7 +614,7 @@ function toggleMute() {
 // ═══════════════════════════════════════════════════════════════════
 //  45-SECOND TIMELINE CONTROLLER
 // ═══════════════════════════════════════════════════════════════════
-const TOTAL_DURATION = 45; // Exactly 45 seconds
+const TOTAL_DURATION = 45;
 let currentTime = 0;
 let isPlaying = false;
 let mainTimer = null;
@@ -635,18 +637,16 @@ function renderFrame(sec) {
   const vb = document.getElementById('videoBody');
   const pill = document.getElementById('stepPill');
 
-  // ── PHASE 1: STEP 1 OF 3 (0s to 15s) ──
-  // "Show a Program Running: Select preset 5: Array Sum, click Step a few times, point to Space-Time Diagram"
   if (sec >= 0 && sec < 15) {
     pill.textContent = "STEP 1 OF 3: SHOW A PROGRAM RUNNING";
     const subCycle = Math.min(5, Math.floor((sec / 15) * 6));
 
     if (sec < 5) {
-      moveCursor(210, 160, true); // Hover on program dropdown
+      moveCursor(210, 160, true);
     } else if (sec < 10) {
-      moveCursor(380, 160, true); // Hover on Step button
+      moveCursor(380, 160, true);
     } else {
-      moveCursor(450, 360, false); // Hover on Space-Time Diagram
+      moveCursor(450, 360, false);
     }
 
     vb.innerHTML = `
@@ -733,22 +733,19 @@ function renderFrame(sec) {
       <div class="action-callout">
         <div class="ac-icon">💡</div>
         <div class="ac-text">
-          <b>What to tell Mam:</b> <span>"Notice how instructions overlap in time inside the Space-Time Diagram, maximizing throughput."</span>
+          <b>Presentation Note:</b> <span>"Notice how instructions overlap in time inside the Space-Time Diagram, maximizing CPU throughput."</span>
         </div>
       </div>
     `;
   }
-
-  // ── PHASE 2: STEP 2 OF 3 (15s to 30s) ──
-  // "Demonstrate Forwarding & Hazards: Toggle Forwarding OFF (CPI rises, STALL bubbles). Toggle ON (Stalls disappear, finishes fast)."
   else if (sec >= 15 && sec < 30) {
     pill.textContent = "STEP 2 OF 3: DEMONSTRATE FORWARDING & HAZARDS";
     const isFwdOn = sec >= 23;
 
     if (sec < 23) {
-      moveCursor(550, 160, true); // Hover on Forwarding Toggle OFF
+      moveCursor(550, 160, true);
     } else {
-      moveCursor(550, 160, true); // Toggle Forwarding back ON
+      moveCursor(550, 160, true);
     }
 
     vb.innerHTML = `
@@ -812,19 +809,16 @@ function renderFrame(sec) {
       <div class="action-callout">
         <div class="ac-icon">⚡</div>
         <div class="ac-text">
-          <b>What to tell Mam:</b> <span>${isFwdOn 
+          <b>Presentation Note:</b> <span>${isFwdOn 
             ? '"With forwarding ON, EX-to-EX bypass delivers the result directly, eliminating 8 stall cycles."' 
             : '"With forwarding OFF, the CPU must stall 2 cycles waiting for register writeback in the WB stage."'}</span>
         </div>
       </div>
     `;
   }
-
-  // ── PHASE 3: STEP 3 OF 3 (30s to 45s) ──
-  // "Show Branch Prediction Comparison: Scroll to Comparison Table, point to Trophy badge 2-bit Saturating"
   else {
     pill.textContent = "STEP 3 OF 3: BRANCH PREDICTION COMPARISON";
-    moveCursor(460, 240, false); // Hover on trophy row
+    moveCursor(460, 240, false);
 
     vb.innerHTML = `
       <div class="scene-header">
@@ -885,7 +879,7 @@ function renderFrame(sec) {
       <div class="action-callout" style="border-color:rgba(16,185,129,0.3); background:rgba(16,185,129,0.08);">
         <div class="ac-icon">🏆</div>
         <div class="ac-text">
-          <b>What to tell Mam:</b> <span style="color:#34d399;">"2-bit Saturating Prediction reduces branch flushes from 7 down to 2, saving 10 cycles and delivering the lowest CPI!"</span>
+          <b>Presentation Note:</b> <span style="color:#34d399;">"2-bit Saturating Prediction reduces branch flushes from 7 down to 2, saving 10 cycles and delivering the lowest CPI!"</span>
         </div>
       </div>
     `;
@@ -931,7 +925,10 @@ function seekTrack(e) {
   updateProgress();
 }
 
-// Initial Frame
+function recordVideoForGithub() {
+  alert("To record this 45-second video file for GitHub on Windows:\n\n1. Press [Win + Alt + R] to start Windows Screen Recorder.\n2. Click the [Play ▶] button.\n3. When it reaches 0:45, press [Win + Alt + R] again.\n\nYour video will be saved in Videos/Captures as an MP4 ready to upload to GitHub!");
+}
+
 renderFrame(0);
 updateProgress();
 </script>
